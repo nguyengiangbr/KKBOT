@@ -1,0 +1,112 @@
+# Build outputs
+bin/
+obj/
+out/
+dist/
+
+# IDE and editor
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+*.code-workspace
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Test results
+TestResults/
+*.trx
+*.xml
+coverage/
+*.coverage
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+*.mdf
+*.ldf
+
+# User secrets
+secrets.json
+*.user
+*.suo
+
+# Local configuration
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+# Profiling
+*.prof
+*.trace
+*.perf
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Crash dumps
+*.dmp
+*.mdmp
+
+# Certificates
+*.pfx
+*.p12
+*.cer
+*.crt
+
+# Docker
+.dockerignore
+
+# Benchmark
+BenchmarkDotNet.Artifacts/
+
+# Research
+research/notebooks/.ipynb_checkpoints/
+research/datasets/
+research/labeling/
+research/training/
+research/export/
+
+# Assets (large files)
+assets/models/*.onnx
+assets/models/*.pt
+assets/templates/*.png
+assets/templates/*.jpg
+!assets/templates/.gitkeep
+
+# Profiles (local overrides)
+profiles/*.local.json
+
+# Installer
+build/installer/
+*.msi
+*.exe
+
+# Documentation generated
+docs/generated/
+
+# KKBOT specific
+*.instance.lock
+*.session.lock
+KKBOT.lock

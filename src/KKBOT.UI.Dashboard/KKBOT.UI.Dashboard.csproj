@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.UI.Dashboard</AssemblyName>
+    <RootNamespace>KKBOT.UI.Dashboard</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.Application\KKBOT.Application.csproj" />
+    <ProjectReference Include="..\KKBOT.Domain\KKBOT.Domain.csproj" />
+    <ProjectReference Include="..\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\KKBOT.Persistence.EfCore\KKBOT.Persistence.EfCore.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\KKBOT.Security\KKBOT.Security.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.0" />
+    <PackageReference Include="MudBlazor" Version="6.19.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+  </ItemGroup>
+
+</Project>

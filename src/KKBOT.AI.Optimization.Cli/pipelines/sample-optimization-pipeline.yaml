@@ -1,0 +1,164 @@
+# KKBOT AI Optimization Pipeline Example
+# This YAML file defines a complete optimization pipeline
+
+pipeline:
+  id: "sample-optimization-pipeline"
+  name: "Sample Optimization Pipeline"
+  description: "Complete optimization pipeline for deploying to Jetson Orin"
+  version: "1.0.0"
+
+globalOptions:
+  modelId: "my-model.onnx"
+  targetPlatform: "nvidia-jetson"  # nvidia-gpu, nvidia-jetson, apple-neural-engine, raspberry-pi, coral-tpu, cpu
+  precisionMode: "int8"  # fp32, fp16, int8, int4, mixed
+  quantization:
+    enabled: true
+    mode: "int8"
+    algorithm: "minmax"
+    granularity: "per-tensor"
+    perChannel: false
+    symmetric: true
+    excludedOperators: []
+    excludedNodes: []
+    calibrationBatchSize: 32
+    calibrationSteps: 100
+  calibration:
+    enabled: true
+    calibrationDataPath: "./calibration-data"
+    batchSize: 32
+    numBatches: 100
+  benchmark:
+    enabled: true
+    warmupRuns: 10
+    benchmarkRuns: 100
+    batchSize: 1
+    testBatchSizes: [1, 2, 4, 8, 16]
+    measureMemory: true
+    measurePower: false
+  targetPlatform: "nvidia-jetson"
+  precisionMode: "int8"
+  maxWorkspaceSizeMB: 1024
+  timeoutMinutes: 60
+  enableProfiling: true
+  saveIntermediateArtifacts: false
+
+steps:
+  - stepId: "load-model"
+    name: "Load Model"
+    stage: "model-loading"
+    config: {}
+    dependsOn: []
+
+  - stepId: "graph-optimization"
+    name: "Graph Optimization"
+    stage: "graph-optimization"
+    config:
+      removeUnusedNodes: true
+      fuseBatchNorm: true
+      fuseTranspose: true
+    dependsOn: ["load-model"]
+
+  - stepId: "constant-folding"
+    name: "Constant Folding"
+    stage: "constant-folding"
+    config:
+      foldConstants: true
+      propagateConstants: true
+    dependsOn: ["graph-optimization"]
+
+  - stepId: "operator-fusion"
+    name: "Operator Fusion"
+    stage: "operator-fusion"
+    config:
+      fuseConvBias: true
+      fuseConvAddRelu: true
+      fuseMatMulAdd: true
+    dependsOn: ["constant-folding"]
+
+  - stepId: "layout-optimization"
+    name: "Layout Optimization"
+    stage: "layout-optimization"
+    config:
+      preferredLayout: "NHWC"
+      optimizeTransposes: true
+    dependsOn: ["operator-fusion"]
+
+  - stepId: "quantization"
+    name: "INT8 Quantization"
+    stage: "quantization"
+    config:
+      mode: "int8"
+      algorithm: "minmax"
+      perChannel: false
+      symmetric: true
+    dependsOn: ["layout-optimization"]
+
+  - stepId: "calibration"
+    name: "Calibration"
+    stage: "calibration"
+    config:
+      calibrationDataPath: "./calibration-data"
+      batchSize: 32
+      numBatches: 100
+    dependsOn: ["quantization"]
+
+  - stepId: "kernel-selection"
+    name: "TensorRT Kernel Selection"
+    stage: "kernel-selection"
+    config:
+      tacticSources: "default"
+      timingIterations: 1
+      profilingVerbosity: "brief"
+    dependsOn: ["calibration"]
+
+  - stepId: "tensorrt-conversion"
+    name: "TensorRT Engine Build"
+    stage: "code-generation"
+    config:
+      precision: "int8"
+      maxWorkspaceSizeMB: 1024
+      maxBatchSize: 1
+      enableFp16: true
+      enableInt8: true
+      enableProfiling: false
+    dependsOn: ["kernel-selection"]
+
+  - stepId: "verification"
+    name: "Model Verification"
+    stage: "verification"
+    config:
+      validateOutputs: true
+      tolerance: 1e-3
+      testInputs: "./test-inputs"
+    dependsOn: ["tensorrt-conversion"]
+
+  - stepId: "benchmarking"
+    name: "Performance Benchmarking"
+    stage: "benchmarking"
+    config:
+      warmupRuns: 10
+      benchmarkRuns: 100
+      batchSizes: [1, 2, 4, 8]
+      measureMemory: true
+      measurePower: false
+    dependsOn: ["verification"]
+
+  - stepId: "packaging"
+    name: "Create Deployment Package"
+    stage: "packaging"
+    config:
+      outputPath: "./deployment-packages"
+      includeRuntime: true
+      includeConfig: true
+      includeLicense: true
+    dependsOn: ["benchmarking"]
+
+  - stepId: "deployment"
+    name: "Deploy to Jetson"
+    stage: "deployment"
+    config:
+      deviceId: "jetson-orin-01"
+      targetPath: "/opt/kkbot/models"
+      autoStart: true
+      enableMonitoring: true
+    dependsOn: ["packaging"]

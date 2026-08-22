@@ -1,0 +1,120 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+[*.cs]
+# StyleCop rules
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_between_query_expression_clauses = true
+csharp_space_after_cast = true
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_parentheses = false
+
+# Naming conventions
+dotnet_naming_rule.interface_naming.severity = suggestion
+dotnet_naming_rule.interface_naming.symbols = interface
+dotnet_naming_rule.interface_naming.style = interface_style
+
+dotnet_naming_style.interface_style.required_prefix = I
+dotnet_naming_style.interface_style.capitalization = pascal_case
+
+dotnet_naming_rule.async_suffix.severity = suggestion
+dotnet_naming_rule.async_suffix.symbols = async_method
+dotnet_naming_rule.async_suffix.style = async_suffix_style
+
+dotnet_naming_style.async_suffix_style.required_suffix = Async
+dotnet_naming_style.async_suffix_style.capitalization = pascal_case
+
+dotnet_naming_symbols.interface.applicable_kinds = interface
+dotnet_naming_symbols.interface.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.interface.required_modifiers =
+
+dotnet_naming_symbols.async_method.applicable_kinds = method
+dotnet_naming_symbols.async_method.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
+dotnet_naming_symbols.async_method.required_modifiers = async
+
+# C# formatting
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less_than_current
+
+# Expression preferences
+csharp_style_expression_bodied_methods = true:silent
+csharp_style_expression_bodied_constructors = true:silent
+csharp_style_expression_bodied_operators = true:silent
+csharp_style_expression_bodied_properties = true:silent
+csharp_style_expression_bodied_indexers = true:silent
+csharp_style_expression_bodied_accessors = true:silent
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_inline_variable_declaration = true:suggestion
+
+# Null checking preferences
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+csharp_style_null_propagation = true:suggestion
+
+# Modifier preferences
+csharp_modifiers_required = partial:suggestion
+csharp_modifiers_required = readonly:suggestion
+
+# Code block preferences
+csharp_prefer_braces = true:suggestion
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_prefer_simple_default_expression = true:suggestion
+
+# Pattern matching preferences
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
+
+# Field preferences
+csharp_style_field_initializer = true:suggestion
+csharp_style_readonly_field = true:suggestion
+
+# Using preferences
+csharp_using_directive_placement = outside_namespace:suggestion
+dotnet_sort_system_directives_first = true
+
+# File header
+file_header_template = // Copyright (c) KKBOT. All rights reserved.\n// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+# Other
+dotnet_remove_unnecessary_suppression = true:suggestion
+dotnet_separate_import_directive_groups = true
+
+# Analyzer configuration
+dotnet_analyzer_diagnostic.category-Style.severity = suggestion
+dotnet_analyzer_diagnostic.category-Maintainability.severity = suggestion
+dotnet_analyzer_diagnostic.category-Design.severity = suggestion
+dotnet_analyzer_diagnostic.category-Performance.severity = suggestion
+dotnet_analyzer_diagnostic.category-Reliability.severity = suggestion
+dotnet_analyzer_diagnostic.category-Security.severity = warning
+
+# Specific analyzer suppressions
+dotnet_diagnostic.CS1591.severity = silent
+dotnet_diagnostic.CA1050.severity = none
+dotnet_diagnostic.CA1051.severity = none
+dotnet_diagnostic.CA1052.severity = none
+dotnet_diagnostic.CA1812.severity = none
+dotnet_diagnostic.CA2254.severity = suggestion
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1601.severity = none

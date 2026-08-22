@@ -1,0 +1,66 @@
+{{- if .Values.monitoring.prometheus.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "kkbot.fullname" . }}-rules
+  labels:
+    {{- include "kkbot.labels" . | nindent 4 }}
+    release: prometheus
+spec:
+  groups:
+    - name: kkbot.rules
+      rules:
+        - alert: KKBOTDown
+          expr: up{job="{{ include "kkbot.fullname" . }}"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "KKBOT instance {{ $labels.instance }} is down"
+            description: "KKBOT has been down for more than 2 minutes."
+
+        - alert: KKBOTHighCPU
+          expr: (rate(container_cpu_usage_seconds_total{pod=~"{{ include "kkbot.fullname" . }}-.*"}[5m]) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "KKBOT high CPU usage"
+            description: "KKBOT pod {{ $labels.pod }} CPU usage is above 80% for 5 minutes."
+
+        - alert: KKBOTHighMemory
+          expr: (container_memory_usage_bytes{pod=~"{{ include "kkbot.fullname" . }}-.*"} / container_spec_memory_limit_bytes{pod=~"{{ include "kkbot.fullname" . }}-.*"}) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "KKBOT high memory usage"
+            description: "KKBOT pod {{ $labels.pod }} memory usage is above 85% for 5 minutes."
+
+        - alert: KKBOTHighErrorRate
+          expr: rate(http_requests_total{job="{{ include "kkbot.fullname" . }}",status=~"5.."}[5m]) > 0.05
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "KKBOT high error rate"
+            description: "KKBOT error rate (5xx) is above 5% for 3 minutes."
+
+        - alert: KKBOTJobQueueBacklog
+          expr: kkbot_jobs_pending > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "KKBOT job queue backlog"
+            description: "More than 100 jobs pending in queue for 5 minutes."
+
+        - alert: KKBOTInstanceError
+          expr: kkbot_instances_status{status="Error"} > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "KKBOT instance in error state"
+            description: "One or more KKBOT instances are in Error state."
+{{- end }}

@@ -1,0 +1,1 @@
+namespace KKBOT.Observability.Metrics; public static class MetricNames { public const string InstancesTotal = "kkbot_instances_total"; public const string JobsRunning = "kkbot_jobs_running"; public const string CpuUsage = "kkbot_cpu_usage_percent"; public const string MemoryUsage = "kkbot_memory_usage_mb"; }

@@ -1,0 +1,23 @@
+# File Index
+
+- `src/KKBOT.Domain/` – core models, enums, functional result types.
+- `src/KKBOT.Contracts/` – DTO definitions for API.
+- `src/KKBOT.Application/` – MediatR commands/queries, validators.
+- `src/KKBOT.Workflow/` – FSM interfaces and implementations.
+- `src/KKBOT.Orchestration/` – Instance manager, scheduler, recovery coordinator.
+- `src/KKBOT.Device.Abstractions/` – Device session contracts.
+- `src/KKBOT.Device.Adb/` – ADB adapter implementation.
+- `src/KKBOT.Device.Simulator/` – Simulated device for testing.
+- `src/KKBOT.Perception.Abstractions/` – Perception pipeline contracts.
+- `src/KKBOT.Perception.OpenCv/` – OpenCV detector.
+- `src/KKBOT.Perception.Ocr/` – Tesseract OCR engine.
+- `src/KKBOT.AI.Abstractions/` – AI service contracts.
+- `src/KKBOT.AI.Ollama/` – Ollama client implementation.
+- `src/KKBOT.Plugins.Abstractions/` – Game module contracts.
+- `src/KKBOT.Plugin.Sample/` – Sample plugin.
+- `src/KKBOT.Persistence/` – EF Core DbContext and repositories.
+- `src/KKBOT.Security/` – Secret store and permission evaluator.
+- `src/KKBOT.Observability/` – Logging and metrics setup.
+- `src/KKBOT.Host/` – Generic host wiring all services.
+- `src/KKBOT.ControlCenter.Wpf/` – UI control center.
+- `src/KKBOT.Dashboard/` – Minimal API for dashboard.

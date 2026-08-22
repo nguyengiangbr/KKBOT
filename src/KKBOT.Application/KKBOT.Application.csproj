@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Application</AssemblyName>
+    <RootNamespace>KKBOT.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.Domain\KKBOT.Domain.csproj" />
+    <ProjectReference Include="..\KKBOT.Contracts\KKBOT.Contracts.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Persistence\KKBOT.Persistence.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Security\KKBOT.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="NodaTime" />
+    <PackageReference Include="Polly" />
+  </ItemGroup>
+</Project>

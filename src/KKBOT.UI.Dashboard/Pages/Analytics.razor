@@ -1,0 +1,555 @@
+@page "/analytics"
+@inject HttpClient Http
+@inject ILogger<Analytics> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Analytics & BI</MudText>
+
+    <MudTabs>
+        <MudTabPanel Text="Overview">
+            <OverviewTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Dashboards">
+            <DashboardsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Reports">
+            <ReportsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Metrics">
+            <MetricsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Alerts">
+            <AlertsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Anomalies">
+            <AnomaliesTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Forecasting">
+            <ForecastingTab />
+        </MudTabPanel>
+        <MudTabPanel Text="KPIs">
+            <KpisTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Cohorts">
+            <CohortsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Funnels">
+            <FunnelsTab />
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    // Overview Tab Component
+    class OverviewTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<OverviewTab> Logger { get; set; } = default!;
+
+        private MarketplaceOverview? _overview;
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _overview = await Http.GetFromJsonAsync<MarketplaceOverview>("api/v1/analytics/overview");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load overview");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Dashboards Tab Component
+    class DashboardsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<DashboardsTab> Logger { get; set; } = default!;
+
+        private List<Dashboard> _dashboards = new();
+        private bool _isLoading = true;
+        private string _searchString = "";
+        private int _currentPage = 1;
+        private int _pageSize = 10;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadDashboards();
+        }
+
+        async Task LoadDashboards()
+        {
+            _isLoading = true;
+            try
+            {
+                var dashboards = await Http.GetFromJsonAsync<List<Dashboard>>($"api/v1/analytics/dashboards?page={_currentPage}&pageSize={_pageSize}");
+                _dashboards = dashboards ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load dashboards");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Reports Tab Component
+    class ReportsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<ReportsTab> Logger { get; set; } = default!;
+
+        private List<Report> _reports = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _reports = await Http.GetFromJsonAsync<List<Report>>("api/v1/analytics/reports") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load reports");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Metrics Tab Component
+    class MetricsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<MetricsTab> Logger { get; set; } = default!;
+
+        private List<MetricDefinition> _metrics = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _metrics = await Http.GetFromJsonAsync<List<MetricDefinition>>("api/v1/analytics/metrics") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load metrics");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Alerts Tab Component
+    class AlertsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<AlertsTab> Logger { get; set; } = default!;
+
+        private List<Alert> _alerts = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _alerts = await Http.GetFromJsonAsync<List<Alert>>("api/v1/analytics/alerts") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load alerts");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Anomalies Tab Component
+    class AnomaliesTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<AnomaliesTab> Logger { get; set; } = default!;
+
+        private List<AnomalyResult> _anomalies = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _anomalies = await Http.GetFromJsonAsync<List<AnomalyResult>>("api/v1/analytics/anomaly/detectors/some-detector-id/anomalies") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load anomalies");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Forecasting Tab Component
+    class ForecastingTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<ForecastingTab> Logger { get; set; } = default!;
+
+        private List<ForecastModel> _models = new();
+        private List<Forecast> _forecasts = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _models = await Http.GetFromJsonAsync<List<ForecastModel>>("api/v1/analytics/forecast/models") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load forecast models");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // KPIs Tab Component
+    class KpisTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<KpisTab> Logger { get; set; } = default!;
+
+        private List<KpiDefinition> _kpis = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _kpis = await Http.GetFromJsonAsync<List<KpiDefinition>>("api/v1/analytics/kpis") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load KPIs");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Cohorts Tab Component
+    class CohortsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<CohortsTab> Logger { get; set; } = default!;
+
+        private List<CohortAnalysis> _cohorts = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _cohorts = await Http.GetFromJsonAsync<List<CohortAnalysis>>("api/v1/analytics/cohorts") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load cohorts");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Funnels Tab Component
+    class FunnelsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<FunnelsTab> Logger { get; set; } = default!;
+
+        private List<FunnelAnalysis> _funnels = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _funnels = await Http.GetFromJsonAsync<List<FunnelAnalysis>>("api/v1/analytics/funnels") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load funnels");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+}
+
+// DTOs for the analytics components
+public record MarketplaceOverview
+{
+    public long TotalPlugins { get; init; }
+    public long PublishedPlugins { get; init; }
+    public long TotalPublishers { get; init; }
+    public long VerifiedPublishers { get; init; }
+    public long TotalDownloads { get; init; }
+    public long MonthlyActiveUsers { get; init; }
+    public double AverageRating { get; init; }
+    public long TotalReviews { get; init; }
+    public long PendingModeration { get; init; }
+    public double ConversionRate { get; init; }
+    public Dictionary<string, long> PluginsByCategory { get; init; } = new();
+    public Dictionary<string, long> PluginsByStatus { get; init; } = new();
+}
+
+public record Dashboard
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string OwnerId { get; init; } = string.Empty;
+    public string TenantId { get; init; } = string.Empty;
+    public bool IsPublic { get; init; }
+    public string LayoutJson { get; init; } = "[]";
+    public string Theme { get; init; } = "light";
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+}
+
+public record Report
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string Category { get; init; } = string.Empty;
+    public string OwnerId { get; init; } = string.Empty;
+    public string TemplateJson { get; init; } = "{}";
+    public string DataSourceJson { get; init; } = "{}";
+    public ReportFormat DefaultFormat { get; init; }
+    public bool IsScheduled { get; init; }
+    public string CronExpression { get; init; } = string.Empty;
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+}
+
+public enum ReportFormat
+{
+    Pdf,
+    Excel,
+    Csv,
+    Json,
+    Html,
+    Png,
+    Parquet
+}
+
+public record MetricDefinition
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string DisplayName { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string Unit { get; init; } = string.Empty;
+    public MetricType Type { get; init; }
+    public string Category { get; init; } = string.Empty;
+    public string Tags { get; init; } = string.Empty;
+    public string QueryJson { get; init; } = "{}";
+    public string DataSourceId { get; init; } = string.Empty;
+    public int RetentionDays { get; init; } = 90;
+    public int AggregationIntervalSeconds { get; init; } = 60;
+    public AggregationFunction Aggregation { get; init; } = AggregationFunction.Avg;
+    public bool IsActive { get; init; } = true;
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+}
+
+public enum MetricType
+{
+    Counter,
+    Gauge,
+    Histogram,
+    Summary,
+    Rate
+}
+
+public enum AggregationFunction
+{
+    Sum,
+    Avg,
+    Min,
+    Max,
+    Count,
+    Percentile50,
+    Percentile90,
+    Percentile95,
+    Percentile99,
+    StdDev,
+    Variance
+}
+
+public record ForecastModel
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public ForecastAlgorithm Algorithm { get; init; }
+    public Guid MetricId { get; init; }
+    public string ModelPath { get; init; } = string.Empty;
+    public bool IsTrained { get; init; }
+    public bool IsActive { get; init; } = true;
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+}
+
+public enum ForecastAlgorithm
+{
+    Prophet,
+    ARIMA,
+    SARIMA,
+    ETS,
+    LSTM,
+    GRU,
+    Transformer,
+    NBEATS,
+    TFT,
+    AutoARIMA,
+    AutoETS,
+    LightGBM,
+    XGBoost,
+    LinearRegression,
+    RandomForest,
+    Custom
+}
+
+public record CohortAnalysis
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public CohortType Type { get; init; }
+    public DateTime StartDate { get; init; }
+    public DateTime EndDate { get; init; }
+    public string CohortDefinition { get; init; } = string.Empty;
+    public string MetricDefinition { get; init; } = string.Empty;
+    public int PeriodCount { get; init; } = 12;
+    public PeriodGranularity Granularity { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+
+public enum CohortType
+{
+    Acquisition,
+    Behavioral,
+    Predictive
+}
+
+public enum PeriodGranularity
+{
+    Daily,
+    Weekly,
+    Monthly,
+    Quarterly
+}
+
+public record FunnelAnalysis
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public List<FunnelStep> Steps { get; init; } = new();
+    public DateTime StartDate { get; init; }
+    public DateTime EndDate { get; init; }
+    public string FilterJson { get; init; } = "{}";
+    public DateTime CreatedAt { get; init; }
+}
+
+public record FunnelStep
+{
+    public int Order { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string EventName { get; init; } = string.Empty;
+    public string FilterJson { get; init; } = "{}";
+    public bool IsRequired { get; init; } = true;
+}

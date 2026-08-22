@@ -1,0 +1,193 @@
+@page "/marketplace"
+@inject IPluginRegistry PluginRegistry
+@inject IPluginInstaller PluginInstaller
+@inject ILogger<Marketplace> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Plugin Marketplace</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_searchKeyword" Placeholder="Search plugins..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" Label="Search" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="_selectedTag" Label="Category" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var tag in _availableTags)
+                    {
+                        <MudSelectItem Value="@tag">@tag</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudSelect @bind-Value "_sortBy" Label="Sort By" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="downloads">Downloads</MudSelectItem>
+                    <MudSelectItem Value="rating">Rating</MudSelectItem>
+                    <MudSelectItem Value="updated">Recently Updated</MudSelectItem>
+                    <MudSelectItem Value="name">Name</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudSwitch @bind-Checked="_verifiedOnly" Label="Verified Only" Color="Color.Primary" Class="mt-6" />
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SearchPlugins" StartIcon="@Icons.Material.Filled.Refresh" Class="mt-6 w-100">Search</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudProgressLinear Indeterminate="true" Class="w-100" />
+            <MudText Typo="Typo.body2" Class="text-center mt-2">Loading plugins...</MudText>
+        </MudPaper>
+    }
+    else if (_plugins.Count == 0)
+    {
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudAlert Severity="Severity.Info">No plugins found. Try adjusting your search criteria.</MudAlert>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var plugin in _plugins)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <PluginCard Plugin="plugin" OnInstall="InstallPlugin" OnViewDetails="ViewDetails" />
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudPagination @bind-SelectedPage="_currentPage" TotalItems="_totalCount" PageSize="_pageSize" Class="mt-4" />
+    }
+</MudContainer>
+
+@* Plugin Detail Dialog *@
+<MudDialog @bind-Visible="_showDetailDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        @if (_selectedPlugin != null)
+        {
+            <PluginDetailView Plugin="@_selectedPlugin" OnClose="() => _showDetailDialog = false" OnInstall="InstallPlugin" />
+        }
+    </DialogContent>
+</MudDialog>
+
+@* Install Dialog *@
+<MudDialog @bind-Visible="_showInstallDialog" MaxWidth="MaxWidth.Small">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Install @(_pendingInstallPlugin?.Manifest.Name ?? "Plugin")</MudText>
+        <MudText Typo="Typo.body2">Version: @(_pendingInstallPlugin?.Version ?? "latest")</MudText>
+        @if (_pendingInstallResult != null && !_pendingInstallResult.Success)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_pendingInstallResult.ErrorMessage</MudAlert>
+        }
+        @if (_pendingInstallResult != null && _pendingInstallResult.Success)
+        {
+            <MudAlert Severity="Severity.Success" Class="mt-3">Successfully installed!</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showInstallDialog = false">Close</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmInstall" Disabled="@_isInstalling">@(_isInstalling ? "Installing..." : "Install")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    List<PluginRegistryEntry> _plugins = new();
+    List<string> _availableTags = new();
+    bool _isLoading = true;
+    string _searchKeyword = "";
+    string? _selectedTag;
+    string _sortBy = "downloads";
+    bool _verifiedOnly = false;
+    int _currentPage = 1;
+    int _pageSize = 12;
+    int _totalCount = 0;
+
+    // Dialogs
+    bool _showDetailDialog = false;
+    PluginRegistryEntry? _selectedPlugin;
+    bool _showInstallDialog = false;
+    PluginRegistryEntry? _pendingInstallPlugin;
+    InstallResult? _pendingInstallResult;
+    bool _isInstalling = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTags();
+        await SearchPlugins();
+    }
+
+    async Task LoadTags()
+    {
+        try
+        {
+            var allPlugins = await PluginRegistry.GetAllAsync(CancellationToken.None);
+            _availableTags = allPlugins.SelectMany(p => p.Tags).Distinct().OrderBy(t => t).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load tags");
+        }
+    }
+
+    async Task SearchPlugins()
+    {
+        _isLoading = true;
+        try
+        {
+            var query = new PluginSearchQuery
+            {
+                Keyword = _searchKeyword,
+                Tags = _selectedTag != null ? new[] { _selectedTag } : null,
+                VerifiedOnly = _verifiedOnly,
+                Page = _currentPage,
+                PageSize = _pageSize,
+                SortBy = _sortBy,
+                SortDescending = true
+            };
+
+            var results = await PluginRegistry.SearchAsync(query, CancellationToken.None);
+            _plugins = results.ToList();
+            
+            // For total count, we'd need a separate count endpoint
+            _totalCount = _plugins.Count;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to search plugins");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    void ViewDetails(PluginRegistryEntry plugin)
+    {
+        _selectedPlugin = plugin;
+        _showDetailDialog = true;
+    }
+
+    void InstallPlugin(PluginRegistryEntry plugin)
+    {
+        _pendingInstallPlugin = plugin;
+        _pendingInstallResult = null;
+        _showInstallDialog = true;
+    }
+
+    async Task ConfirmInstall()
+    {
+        if (_pendingInstallPlugin == null) return;
+
+        _isInstalling = true;
+        _pendingInstallResult = await PluginInstaller.InstallAsync(_pendingInstallPlugin.PluginId, _pendingInstallPlugin.Version, CancellationToken.None);
+        _isInstalling = false;
+
+        // Refresh installed list
+        await SearchPlugins();
+    }
+}

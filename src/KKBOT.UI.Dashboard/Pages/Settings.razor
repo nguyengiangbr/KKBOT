@@ -1,0 +1,168 @@
+@page "/settings"
+@inject IConfiguration Configuration
+@inject ISecretManager SecretManager
+@inject IEncryptionService EncryptionService
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Settings</MudText>
+
+    <MudTabs>
+        <MudTabPanel Text="General">
+            <MudPaper Class="pa-4 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Application Settings</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_appName" Label="Application Name" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_environment" Label="Environment" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="_enableTelemetry" Label="Enable Telemetry" Color="Color.Primary" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="_debugMode" Label="Debug Mode" Color="Color.Warning" />
+                    </MudItem>
+                </MudGrid>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveGeneralSettings" Class="mt-3" StartIcon="@Icons.Material.Filled.Save">Save</MudButton>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Security">
+            <MudPaper Class="pa-4 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Secret Management</MudText>
+                <MudText Typo="Typo.body2" Class="mb-3">Manage encrypted secrets (API keys, tokens, passwords)</MudText>
+                
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_secretKey" Label="Secret Key" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_secretValue" Label="Secret Value" Required="true" InputType="InputType.Password" />
+                    </MudItem>
+                </MudGrid>
+                <MudGrid Class="mt-2">
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SetSecret" StartIcon="@Icons.Material.Filled.Lock">Set Secret</MudButton>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@GetSecret" StartIcon="@Icons.Material.Filled.Visibility">Get Secret</MudButton>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@DeleteSecret" StartIcon="@Icons.Material.Filled.Delete">Delete Secret</MudButton>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="mb-3">Encryption Test</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_plainText" Label="Plain Text" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_encryptedText" Label="Encrypted (Base64)" ReadOnly="true" />
+                    </MudItem>
+                </MudGrid>
+                <MudGrid Class="mt-2">
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@EncryptText" StartIcon="@Icons.Material.Filled.Lock">Encrypt</MudButton>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@DecryptText" StartIcon="@Icons.Material.Filled.LockOpen">Decrypt</MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Database">
+            <MudPaper Class="pa-4 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Database Configuration</MudText>
+                <MudTextField @bind-Value="_connectionString" Label="Connection String" HelperText="SQLite: DataSource=kkbot.db" Required="true" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@TestConnection" Class="mt-3" StartIcon="@Icons.Material.Filled.Storage">Test Connection</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@RunMigrations" Class="mt-3 ml-2" StartIcon="@Icons.Material.Filled.Build">Run Migrations</MudButton>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Plugins">
+            <MudPaper Class="pa-4 mt-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Plugin Directory</MudText>
+                <MudTextField @bind-Value="_pluginsPath" Label="Plugins Path" HelperText="Absolute or relative path to plugin DLLs" Required="true" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SavePluginPath" Class="mt-3" StartIcon="@Icons.Material.Filled.Folder">Save Path</MudButton>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    // General
+    string _appName = "KKBOT";
+    string _environment = "Development";
+    bool _enableTelemetry = true;
+    bool _debugMode = false;
+
+    // Security
+    string _secretKey = "";
+    string _secretValue = "";
+    string _secretResult = "";
+    string _plainText = "";
+    string _encryptedText = "";
+
+    // Database
+    string _connectionString = "DataSource=kkbot.db";
+
+    // Plugins
+    string _pluginsPath = "plugins";
+
+    async Task SaveGeneralSettings()
+    {
+        // In real app, persist to config file or database
+        await Task.CompletedTask;
+    }
+
+    async Task SetSecret()
+    {
+        await SecretManager.SetSecretAsync(_secretKey, _secretValue, CancellationToken.None);
+        _secretResult = "Secret saved successfully";
+    }
+
+    async Task GetSecret()
+    {
+        var value = await SecretManager.GetSecretAsync(_secretKey, CancellationToken.None);
+        _secretResult = value ?? "Secret not found";
+    }
+
+    async Task DeleteSecret()
+    {
+        await SecretManager.DeleteSecretAsync(_secretKey, CancellationToken.None);
+        _secretResult = "Secret deleted";
+    }
+
+    void EncryptText()
+    {
+        _encryptedText = EncryptionService.Encrypt(_plainText);
+    }
+
+    void DecryptText()
+    {
+        _plainText = EncryptionService.Decrypt(_encryptedText);
+    }
+
+    async Task TestConnection()
+    {
+        // Test DB connection
+        await Task.CompletedTask;
+    }
+
+    async Task RunMigrations()
+    {
+        // Run EF Core migrations
+        await Task.CompletedTask;
+    }
+
+    async Task SavePluginPath()
+    {
+        // Save to config
+        await Task.CompletedTask;
+    }
+}

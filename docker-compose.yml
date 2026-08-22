@@ -1,0 +1,180 @@
+version: '3.8'
+
+services:
+  kkbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kkbot
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - kkbot_data:/app/data
+      - kkbot_logs:/app/logs
+      - ./plugins:/app/plugins:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__KkbotDb=DataSource=/app/data/kkbot.db
+      - ConnectionStrings__MarketplaceDb=DataSource=/app/data/marketplace.db
+      - Security__SecretsPath=/app/data/secrets.json
+      - Security__EncryptionPassphrase=${ENCRYPTION_PASSPHRASE:-change-me-in-production}
+      - Security__EncryptionSalt=${ENCRYPTION_SALT:-change-me-in-production}
+      - Plugins__Path=/app/plugins
+      - Marketplace__Storage__Type=Local
+      - Marketplace__Storage__Local__Path=/app/storage/marketplace
+    depends_on:
+      - marketplace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - kkbot_network
+
+  marketplace:
+    build:
+      context: .
+      dockerfile: src/KKBOT.Marketplace.Server/Dockerfile
+    container_name: kkbot_marketplace
+    ports:
+      - "8082:8080"
+      - "8083:8081"
+    volumes:
+      - marketplace_data:/app/data
+      - marketplace_storage:/app/storage
+      - marketplace_logs:/app/logs
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__MarketplaceDb=DataSource=/app/data/marketplace.db
+      - ConnectionStrings__KkbotDb=DataSource=/app/data/kkbot.db
+      - Security__SecretsPath=/app/data/secrets.json
+      - Security__EncryptionPassphrase=${ENCRYPTION_PASSPHRASE:-change-me-in-production}
+      - Security__EncryptionSalt=${ENCRYPTION_SALT:-change-me-in-production}
+      - Marketplace__Storage__Type=Local
+      - Marketplace__Storage__Local__Path=/app/storage/marketplace
+      - Marketplace__Signing__RequireSigning=true
+    depends_on:
+      - minio
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - kkbot_network
+
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    container_name: kkbot_minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kkbot_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: kkbot_redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kkbot_network
+
+  # Optional: PostgreSQL for production
+  postgres:
+    image: postgres:16-alpine
+    container_name: kkbot_postgres
+    environment:
+      - POSTGRES_DB=kkbot
+      - POSTGRES_USER=kkbot
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-kkbot_secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - kkbot_network
+    profiles:
+      - postgres
+
+  # Optional: Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: kkbot_prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - kkbot_network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: kkbot_grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - kkbot_network
+    profiles:
+      - monitoring
+
+volumes:
+  kkbot_data:
+  kkbot_logs:
+  marketplace_data:
+  marketplace_storage:
+  marketplace_logs:
+  minio_data:
+  redis_data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  kkbot_network:
+    driver: bridge

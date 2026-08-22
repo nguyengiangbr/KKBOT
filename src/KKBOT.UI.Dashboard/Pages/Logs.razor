@@ -1,0 +1,148 @@
+@page "/logs"
+@inject ILogger<Logs> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Application Logs</MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="_levelFilter" Label="Log Level" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    <MudSelectItem Value="LogLevel.Trace">Trace</MudSelectItem>
+                    <MudSelectItem Value="LogLevel.Debug">Debug</MudSelectItem>
+                    <MudSelectItem Value="LogLevel.Information">Information</MudSelectItem>
+                    <MudSelectItem Value="LogLevel.Warning">Warning</MudSelectItem>
+                    <MudSelectItem Value="LogLevel.Error">Error</MudSelectItem>
+                    <MudSelectItem Value="LogLevel.Critical">Critical</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudTextField @bind-Value="_searchString" Placeholder="Filter message..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" />
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@LoadLogs" StartIcon="@Icons.Material.Filled.Refresh" Class="mt-6 w-100">Refresh</MudButton>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@ClearLogs" StartIcon="@Icons.Material.Filled.DeleteSweep" Class="mt-6 w-100">Clear</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2" Style="max-height: 600px; overflow: auto;">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_logs.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="text-secondary">No logs available.</MudText>
+        }
+        else
+        {
+            <MudTable Items="@_filteredLogs" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Time</MudTh>
+                    <MudTh>Level</MudTh>
+                    <MudTh>Source</MudTh>
+                    <MudTh>Message</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Timestamp.ToString("HH:mm:ss.fff")</MudTd>
+                    <MudTd><MudChip Color="@GetLevelColor(context.Level)" Size="Size.Small">@context.Level</MudChip></MudTd>
+                    <MudTd><MudText Typo="Typo.caption">@context.Source</MudText></MudTd>
+                    <MudTd>@context.Message</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    List<LogEntry> _logs = new();
+    List<LogEntry> _filteredLogs = new();
+    bool _isLoading = true;
+    LogLevel? _levelFilter;
+    string _searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    Task LoadLogs()
+    {
+        _isLoading = true;
+        // In a real app, this would read from Serilog file sink or a log database
+        // For demo, we'll generate some sample logs
+        _logs = GenerateSampleLogs();
+        ApplyFilters();
+        _isLoading = false;
+        return Task.CompletedTask;
+    }
+
+    void ApplyFilters()
+    {
+        var query = _logs.AsQueryable();
+        
+        if (_levelFilter.HasValue)
+            query = query.Where(l => l.Level >= _levelFilter.Value);
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+            query = query.Where(l => l.Message.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+        _filteredLogs = query.OrderByDescending(l => l.Timestamp).Take(1000).ToList();
+    }
+
+    void ClearLogs()
+    {
+        _logs.Clear();
+        ApplyFilters();
+    }
+
+    List<LogEntry> GenerateSampleLogs()
+    {
+        var logs = new List<LogEntry>();
+        var levels = new[] { LogLevel.Information, LogLevel.Warning, LogLevel.Error, LogLevel.Debug };
+        var sources = new[] { "Orchestrator", "PluginLoader", "DeviceManager", "AI", "Perception" };
+        var messages = new[]
+        {
+            "Instance started successfully",
+            "Plugin loaded: sample-game v1.0.0",
+            "Device connected: emulator-5554",
+            "AI request completed in 1.2s",
+            "Perception pipeline processed frame",
+            "Job queued: daily-quest",
+            "Template match found: button_login",
+            "OCR result: 'Welcome back!'",
+            "Health check passed",
+            "Configuration reloaded"
+        };
+
+        var rnd = new Random();
+        for (int i = 0; i < 200; i++)
+        {
+            logs.Add(new LogEntry
+            {
+                Timestamp = DateTime.Now.AddMinutes(-rnd.Next(0, 1440)),
+                Level = levels[rnd.Next(levels.Length)],
+                Source = sources[rnd.Next(sources.Length)],
+                Message = messages[rnd.Next(messages.Length)]
+            });
+        }
+        return logs.OrderByDescending(l => l.Timestamp).ToList();
+    }
+
+    Color GetLevelColor(LogLevel level) => level switch
+    {
+        LogLevel.Trace => Color.Default,
+        LogLevel.Debug => Color.Info,
+        LogLevel.Information => Color.Success,
+        LogLevel.Warning => Color.Warning,
+        LogLevel.Error => Color.Error,
+        LogLevel.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    record LogEntry(DateTime Timestamp, LogLevel Level, string Source, string Message);
+}

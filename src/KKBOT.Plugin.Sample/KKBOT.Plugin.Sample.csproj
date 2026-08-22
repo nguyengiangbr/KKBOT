@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Plugin.Sample</AssemblyName>
+    <RootNamespace>KKBOT.Plugin.Sample</RootNamespace>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

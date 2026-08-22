@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  kkbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__KkbotDb=DataSource=/app/data/kkbot.db
+      - Security__SecretsPath=/app/data/secrets.json
+      - Security__EncryptionPassphrase=dev-passphrase
+      - Security__EncryptionSalt=dev-salt
+      - Plugins__Path=/app/plugins
+    volumes:
+      - ./src:/src:ro
+      - ./tests:/tests:ro
+      - kkbot_data:/app/data
+      - kkbot_logs:/app/logs
+      - ./plugins:/app/plugins
+    command: ["dotnet", "watch", "--project", "src/KKBOT.UI.Dashboard/KKBOT.UI.Dashboard.csproj", "--no-restore"]
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src
+          ignore:
+            - "**/bin/**"
+            - "**/obj/**"
+
+volumes:
+  kkbot_data:
+  kkbot_logs:

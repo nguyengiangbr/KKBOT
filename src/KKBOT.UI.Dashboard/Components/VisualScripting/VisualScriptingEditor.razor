@@ -1,0 +1,490 @@
+// Copyright (c) KKBOT. All rights reserved.
+// Licensed under the MIT License.
+
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
+using MudBlazor;
+using KKBOT.VisualScripting.Models;
+using System.Text.Json;
+
+namespace KKBOT.UI.Dashboard.Components.VisualScripting;
+
+public partial class VisualScriptingEditor : ComponentBase, IAsyncDisposable
+{
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private IVisualScriptingEngine Engine { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private ILogger<VisualScriptingEditor> Logger { get; set; } = default!;
+
+    [Parameter] public VisualWorkflow? Workflow { get; set; }
+    [Parameter] public EventCallback<VisualWorkflow> WorkflowChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; } = false;
+
+    private MudCanvas? _canvas;
+    private bool _isDragging = false;
+    private WorkflowNode? _draggedNode;
+    private WorkflowNode? _selectedNode;
+    private WorkflowNode? _connectingFromNode;
+    private string? _connectingFromPort;
+    private Point _mousePosition = new();
+    private bool _showNodePalette = true;
+    private string _searchNodeType = "";
+    private string _workflowJson = "";
+    private bool _showProperties = true;
+    private bool _showExecutionLog = false;
+    private WorkflowExecutionResult? _lastExecutionResult;
+    private CancellationTokenSource? _executionCts;
+    private bool _isExecuting = false;
+    private double _zoom = 1.0;
+    private Point _panOffset = new(0, 0);
+
+    private readonly List<NodeDefinition> _nodeDefinitions = new()
+    {
+        new NodeDefinition { Id = "start", Name = "Start", Category = "Control Flow", Icon = "play_arrow", Color = "#4CAF50",
+            OutputPorts = new() { new NodePortDefinition { Id = "output", Name = "Start", DataType = PortDataType.Any } } },
+        new NodeDefinition { Id = "end", Name = "End", Category = "Control Flow", Icon = "stop", Color = "#F44336",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Finish", DataType = PortDataType.Any } } },
+        new NodeDefinition { Id = "condition", Name = "Condition", Category = "Control Flow", Icon = "rule", Color = "#FF9800",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Value", DataType = PortDataType.Boolean, IsRequired = true } },
+            OutputPorts = new() { new NodePortDefinition { Id = "true", Name = "True", DataType = PortDataType.Any }, new NodePortDefinition { Id = "false", Name = "False", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "condition", Name = "Condition", DataType = PropertyDataType.String, DefaultValue = "true" } } },
+        new NodeDefinition { Id = "parallel", Name = "Parallel", Category = "Control Flow", Icon = "call_split", Color = "#9C27B0",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Input", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "branch1", Name = "Branch 1", DataType = PortDataType.Any }, new NodePortDefinition { Id = "branch2", Name = "Branch 2", DataType = PortDataType.Any } } },
+        new NodeDefinition { Id = "delay", Name = "Delay", Category = "Control Flow", Icon = "timer", Color = "#607D8B",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Trigger", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "output", Name = "Done", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "delayMs", Name = "Delay (ms)", DataType = PropertyDataType.Integer, DefaultValue = 1000 } } },
+        new NodeDefinition { Id = "setVariable", Name = "Set Variable", Category = "Variables", Icon = "assignment", Color = "#2196F3",
+            InputPorts = new() { new NodePortDefinition { Id = "value", Name = "Value", DataType = PortDataType.Any, IsRequired = true }, new NodePortDefinition { Id = "trigger", Name = "Trigger", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "output", Name = "Output", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "name", Name = "Variable Name", DataType = PropertyDataType.String, IsRequired = true } } },
+        new NodeDefinition { Id = "getVariable", Name = "Get Variable", Category = "Variables", Icon = "visibility", Color = "#03A9F4",
+            OutputPorts = new() { new NodePortDefinition { Id = "value", Name = "Value", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "name", Name = "Variable Name", DataType = PropertyDataType.String, IsRequired = true } } },
+        new NodeDefinition { Id = "log", Name = "Log", Category = "Utilities", Icon = "article", Color = "#795548",
+            InputPorts = new() { new NodePortDefinition { Id = "message", Name = "Message", DataType = PortDataType.String, IsRequired = true }, new NodePortDefinition { Id = "trigger", Name = "Trigger", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "level", Name = "Log Level", DataType = PropertyDataType.Enum, DefaultValue = "Information", Options = new() { new PropertyOption { Value = "Trace", Label = "Trace" }, new PropertyOption { Value = "Debug", Label = "Debug" }, new PropertyOption { Value = "Information", Label = "Information" }, new PropertyOption { Value = "Warning", Label = "Warning" }, new PropertyOption { Value = "Error", Label = "Error" }, new PropertyOption { Value = "Critical", Label = "Critical" } } } },
+        new NodeDefinition { Id = "httpRequest", Name = "HTTP Request", Category = "Integration", Icon = "cloud", Color = "#00BCD4",
+            InputPorts = new() { new NodePortDefinition { Id = "url", Name = "URL", DataType = PortDataType.String, IsRequired = true }, new NodePortDefinition { Id = "headers", Name = "Headers", DataType = PortDataType.Object }, new NodePortDefinition { Id = "body", Name = "Body", DataType = PortDataType.Object }, new NodePortDefinition { Id = "trigger", Name = "Trigger", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "statusCode", Name = "Status Code", DataType = PortDataType.Integer }, new NodePortDefinition { Id = "body", Name = "Response Body", DataType = PortDataType.Object }, new NodePortDefinition { Id = "success", Name = "Success", DataType = PortDataType.Boolean } },
+            Properties = new() { new NodePropertyDefinition { Id = "method", Name = "Method", DataType = PropertyDataType.Enum, DefaultValue = "GET", Options = new() { new PropertyOption { Value = "GET", Label = "GET" }, new PropertyOption { Value = "POST", Label = "POST" }, new PropertyOption { Value = "PUT", Label = "PUT" }, new PropertyOption { Value = "DELETE", Label = "DELETE" } } } },
+        new NodeDefinition { Id = "pluginAction", Name = "Plugin Action", Category = "Game", Icon = "extension", Color = "#E91E63",
+            InputPorts = new() { new NodePortDefinition { Id = "parameters", Name = "Parameters", DataType = PortDataType.Object }, new NodePortDefinition { Id = "trigger", Name = "Trigger", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "result", Name = "Result", DataType = PortDataType.Object } },
+            Properties = new() { new NodePropertyDefinition { Id = "pluginId", Name = "Plugin ID", DataType = PropertyDataType.String, IsRequired = true }, new NodePropertyDefinition { Id = "actionId", Name = "Action ID", DataType = PropertyDataType.String, IsRequired = true } } },
+        new NodeDefinition { Id = "aiInference", Name = "AI Inference", Category = "AI", Icon = "psychology", Color = "#673AB7",
+            InputPorts = new() { new NodePortDefinition { Id = "prompt", Name = "Prompt", DataType = PortDataType.String, IsRequired = true }, new NodePortDefinition { Id = "image", Name = "Image", DataType = PortDataType.Image }, new NodePortDefinition { Id = "trigger", Name = "Trigger", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "response", Name = "Response", DataType = PortDataType.String }, new NodePortDefinition { Id = "tokens", Name = "Tokens Used", DataType = PortDataType.Integer } },
+            Properties = new() { new NodePropertyDefinition { Id = "modelId", Name = "Model ID", DataType = PropertyDataType.String, IsRequired = true } } },
+        new NodeDefinition { Id = "deviceCapture", Name = "Device Capture", Category = "Device", Icon = "camera_alt", Color = "#009688",
+            OutputPorts = new() { new NodePortDefinition { Id = "frame", Name = "Frame", DataType = PortDataType.Image }, new NodePortDefinition { Id = "timestamp", Name = "Timestamp", DataType = PortDataType.DateTime } },
+            Properties = new() { new NodePropertyDefinition { Id = "deviceId", Name = "Device ID", DataType = PropertyDataType.String } } },
+        new NodeDefinition { Id = "deviceInput", Name = "Device Input", Category = "Device", Icon = "touch_app", Color = "#009688",
+            InputPorts = new() { new NodePortDefinition { Id = "action", Name = "Action", DataType = PortDataType.String, IsRequired = true }, new NodePortDefinition { Id = "parameters", Name = "Parameters", DataType = PortDataType.Object }, new NodePortDefinition { Id = "trigger", Name = "Trigger", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "result", Name = "Result", DataType = PortDataType.Object } },
+            Properties = new() { new NodePropertyDefinition { Id = "deviceId", Name = "Device ID", DataType = PropertyDataType.String } } },
+        new NodeDefinition { Id = "perception", Name = "Perception", Category = "AI", Icon = "visibility", Color = "#673AB7",
+            InputPorts = new() { new NodePortDefinition { Id = "frame", Name = "Frame", DataType = PortDataType.Image, IsRequired = true } },
+            OutputPorts = new() { new NodePortDefinition { Id = "detections", Name = "Detections", DataType = PortDataType.Array }, new NodePortDefinition { Id = "confidence", Name = "Confidence", DataType = PortDataType.Number } },
+            Properties = new() { new NodePropertyDefinition { Id = "detectorId", Name = "Detector ID", DataType = PropertyDataType.String } } },
+        new NodeDefinition { Id = "transform", Name = "Transform", Category = "Data", Icon = "transform", Color = "#FF9800",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Input", DataType = PortDataType.Any, IsRequired = true } },
+            OutputPorts = new() { new NodePortDefinition { Id = "output", Name = "Output", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "transformType", Name = "Transform Type", DataType = PropertyDataType.Enum, DefaultValue = "map", Options = new() { new PropertyOption { Value = "map", Label = "Map" }, new PropertyOption { Value = "filter", Label = "Filter" }, new PropertyOption { Value = "script", Label = "Script" } } }, new NodePropertyDefinition { Id = "script", Name = "Script", DataType = PropertyDataType.Code, UIHint = PropertyUIHint.CodeEditor } } },
+        new NodeDefinition { Id = "filter", Name = "Filter", Category = "Data", Icon = "filter_list", Color = "#FF9800",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Input", DataType = PortDataType.Array, IsRequired = true } },
+            OutputPorts = new() { new NodePortDefinition { Id = "output", Name = "Output", DataType = PortDataType.Array } },
+            Properties = new() { new NodePropertyDefinition { Id = "condition", Name = "Filter Condition", DataType = PropertyDataType.String, DefaultValue = "true" } } },
+        new NodeDefinition { Id = "loop", Name = "Loop", Category = "Control Flow", Icon = "loop", Color = "#9C27B0",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Input", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "output", Name = "Output", DataType = PortDataType.Any }, new NodePortDefinition { Id = "iteration", Name = "Iteration", DataType = PortDataType.Integer } },
+            Properties = new() { new NodePropertyDefinition { Id = "maxIterations", Name = "Max Iterations", DataType = PropertyDataType.Integer, DefaultValue = 10 }, new NodePropertyDefinition { Id = "condition", Name = "Continue Condition", DataType = PropertyDataType.String, DefaultValue = "true" } } },
+        new NodeDefinition { Id = "branch", Name = "Branch", Category = "Control Flow", Icon = "call_split", Color = "#9C27B0",
+            InputPorts = new() { new NodePortDefinition { Id = "input", Name = "Input", DataType = PortDataType.Any } },
+            OutputPorts = new() { new NodePortDefinition { Id = "branch1", Name = "Branch 1", DataType = PortDataType.Any }, new NodePortDefinition { Id = "branch2", Name = "Branch 2", DataType = PortDataType.Any } },
+            Properties = new() { new NodePropertyDefinition { Id = "branches", Name = "Branches", DataType = PropertyDataType.Array, UIHint = PropertyUIHint.Json } } }
+    ];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeCanvasAsync();
+            if (Workflow != null)
+            {
+                await RenderWorkflowAsync();
+            }
+        }
+    }
+
+    private async Task InitializeCanvasAsync()
+    {
+        if (_canvas == null) return;
+        await JS.InvokeVoidAsync("visualScripting.initializeCanvas", _canvas.Ref, DotNetObjectReference.Create(this));
+    }
+
+    private async Task RenderWorkflowAsync()
+    {
+        if (Workflow == null || _canvas == null) return;
+        await JS.InvokeVoidAsync("visualScripting.renderWorkflow", _canvas.Ref, JsonSerializer.Serialize(Workflow));
+    }
+
+    [JSInvokable]
+    public async Task OnNodeClick(string nodeId)
+    {
+        var node = Workflow?.Nodes.FirstOrDefault(n => n.Id == nodeId);
+        if (node != null)
+        {
+            _selectedNode = node;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnCanvasClick(double x, double y)
+    {
+        _selectedNode = null;
+        _connectingFromNode = null;
+        _connectingFromPort = null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnNodeDragStart(string nodeId, double x, double y)
+    {
+        if (ReadOnly) return;
+        var node = Workflow?.Nodes.FirstOrDefault(n => n.Id == nodeId);
+        if (node != null)
+        {
+            _isDragging = true;
+            _draggedNode = node;
+            _mousePosition = new Point(x, y);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnNodeDrag(double x, double y)
+    {
+        if (!_isDragging || _draggedNode == null) return;
+        
+        var dx = x - _mousePosition.X;
+        var dy = y - _mousePosition.Y;
+        
+        _draggedNode!.Position.X += dx;
+        _draggedNode.Position.Y += dy;
+        _mousePosition = new Point(x, y);
+        
+        await JS.InvokeVoidAsync("visualScripting.updateNodePosition", _draggedNode.Id, _draggedNode.Position.X, _draggedNode.Position.Y);
+    }
+
+    [JSInvokable]
+    public async Task OnNodeDragEnd()
+    {
+        _isDragging = false;
+        _draggedNode = null;
+        if (Workflow != null)
+        {
+            await WorkflowChanged.InvokeAsync(Workflow);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPortClick(string nodeId, string portId, bool isInput)
+    {
+        if (ReadOnly) return;
+        
+        var node = Workflow?.Nodes.FirstOrDefault(n => n.Id == nodeId);
+        if (node == null) return;
+
+        var port = isInput ? node.Inputs.GetValueOrDefault(portId) : node.Outputs.GetValueOrDefault(portId);
+        if (port == null) return;
+
+        if (_connectingFromNode == null)
+        {
+            _connectingFromNode = node;
+            _connectingFromPort = portId;
+        }
+        else
+        {
+            if (isInput)
+            {
+                var edge = new WorkflowEdge
+                {
+                    SourceNodeId = _connectingFromNode.Id,
+                    SourcePortId = _connectingFromPort!,
+                    TargetNodeId = node.Id,
+                    TargetPortId = portId
+                };
+                
+                if (Workflow != null)
+                {
+                    Workflow.Edges.Add(edge);
+                    await WorkflowChanged.InvokeAsync(Workflow);
+                    await RenderWorkflowAsync();
+                }
+            }
+            else
+            {
+                var edge = new WorkflowEdge
+                {
+                    SourceNodeId = node.Id,
+                    SourcePortId = portId,
+                    TargetNodeId = _connectingFromNode.Id,
+                    TargetPortId = _connectingFromPort!
+                };
+                
+                if (Workflow != null)
+                {
+                    Workflow.Edges.Add(edge);
+                    await WorkflowChanged.InvokeAsync(Workflow);
+                    await RenderWorkflowAsync();
+                }
+            }
+            
+            _connectingFromNode = null;
+            _connectingFromPort = null;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnDeleteNode(string nodeId)
+    {
+        if (ReadOnly || Workflow == null) return;
+        
+        var node = Workflow.Nodes.FirstOrDefault(n => n.Id == nodeId);
+        if (node != null)
+        {
+            Workflow.Edges.RemoveAll(e => e.SourceNodeId == nodeId || e.TargetNodeId == nodeId);
+            Workflow.Nodes.Remove(node);
+            
+            if (_selectedNode?.Id == nodeId)
+            {
+                _selectedNode = null;
+            }
+            
+            await WorkflowChanged.InvokeAsync(Workflow);
+            await RenderWorkflowAsync();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnDeleteEdge(string edgeId)
+    {
+        if (ReadOnly || Workflow == null) return;
+        
+        Workflow.Edges.RemoveAll(e => e.Id == edgeId);
+        await WorkflowChanged.InvokeAsync(Workflow);
+        await RenderWorkflowAsync();
+    }
+
+    [JSInvokable]
+    public async Task OnCanvasPan(double dx, double dy)
+    {
+        _panOffset.X += dx;
+        _panOffset.Y += dy;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnCanvasZoom(double zoom)
+    {
+        _zoom = Math.Clamp(zoom, 0.1, 3.0);
+        StateHasChanged();
+    }
+
+    private async Task AddNode(string nodeTypeId)
+    {
+        if (ReadOnly || Workflow == null) return;
+        
+        var definition = _nodeDefinitions.FirstOrDefault(d => d.Id == nodeTypeId);
+        if (definition == null) return;
+
+        var node = new WorkflowNode
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            NodeTypeId = definition.Id,
+            Name = definition.Name,
+            Description = definition.Description,
+            Position = new NodePosition { X = 100 + Workflow.Nodes.Count * 50, Y = 100 + Workflow.Nodes.Count * 50 }
+        };
+
+        foreach (var portDef in definition.InputPorts)
+        {
+            node.Inputs[portDef.Id] = new NodePort
+            {
+                Id = portDef.Id,
+                Name = portDef.Name,
+                Description = portDef.Description,
+                DataType = portDef.DataType,
+                IsRequired = portDef.IsRequired,
+                IsMultiple = portDef.IsMultiple,
+                DefaultValue = portDef.DefaultValue,
+                ValidationRules = portDef.ValidationRules
+            };
+        }
+
+        foreach (var portDef in definition.OutputPorts)
+        {
+            node.Outputs[portDef.Id] = new NodePort
+            {
+                Id = portDef.Id,
+                Name = portDef.Name,
+                Description = portDef.Description,
+                DataType = portDef.DataType,
+                IsRequired = portDef.IsRequired,
+                IsMultiple = portDef.IsMultiple,
+                DefaultValue = portDef.DefaultValue,
+                ValidationRules = portDef.ValidationRules
+            };
+        }
+
+        foreach (var propDef in definition.Properties)
+        {
+            node.Properties[propDef.Id] = propDef.DefaultValue ?? GetDefaultValue(propDef.DataType);
+        }
+
+        Workflow.Nodes.Add(node);
+        await WorkflowChanged.InvokeAsync(Workflow);
+        await RenderWorkflowAsync();
+        
+        Snackbar.Add($"Added {definition.Name} node", Severity.Success);
+    }
+
+    private object? GetDefaultValue(PropertyDataType dataType)
+    {
+        return dataType switch
+        {
+            PropertyDataType.String => "",
+            PropertyDataType.Integer => 0,
+            PropertyDataType.Number => 0.0,
+            PropertyDataType.Boolean => false,
+            PropertyDataType.Json => "{}",
+            PropertyDataType.Array => new List<object>(),
+            PropertyDataType.Enum => "",
+            _ => null
+        };
+    }
+
+    private async Task ExecuteWorkflow()
+    {
+        if (Workflow == null) return;
+        
+        _isExecuting = true;
+        _executionCts = new CancellationTokenSource();
+        _lastExecutionResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await Engine.ExecuteWorkflowAsync(Workflow!, null, _executionCts.Token);
+            _lastExecutionResult = result;
+            
+            if (result.Status == WorkflowExecutionStatus.Completed)
+            {
+                Snackbar.Add("Workflow executed successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Workflow failed: {result.ErrorMessage}", Severity.Error);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Snackbar.Add("Execution cancelled", Severity.Warning);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Workflow execution failed");
+            Snackbar.Add($"Execution error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExecuting = false;
+            _executionCts = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CancelExecution()
+    {
+        if (_executionCts != null)
+        {
+            _executionCts.Cancel();
+            Snackbar.Add("Cancelling execution...", Severity.Info);
+        }
+    }
+
+    private async Task SaveWorkflow()
+    {
+        if (Workflow == null) return;
+        
+        _workflowJson = JsonSerializer.Serialize(Workflow, new JsonSerializerOptions { WriteIndented = true });
+        Snackbar.Add("Workflow saved!", Severity.Success);
+    }
+
+    private async Task LoadWorkflow()
+    {
+        if (string.IsNullOrWhiteSpace(_workflowJson)) return;
+        
+        try
+        {
+            var workflow = JsonSerializer.Deserialize<VisualWorkflow>(_workflowJson);
+            if (workflow != null)
+            {
+                Workflow = workflow;
+                await WorkflowChanged.InvokeAsync(Workflow);
+                await RenderWorkflowAsync();
+                Snackbar.Add("Workflow loaded!", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load workflow: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ValidateWorkflow()
+    {
+        if (Workflow == null) return;
+        
+        var result = await Engine.ValidateWorkflowAsync(Workflow);
+        
+        if (result.IsValid)
+        {
+            Snackbar.Add("Workflow is valid!", Severity.Success);
+        }
+        else
+        {
+            var errors = string.Join("\n", result.Errors.Select(e => e.Message));
+            Snackbar.Add($"Validation failed:\n{errors}", Severity.Error);
+        }
+    }
+
+    private void ZoomIn() => _zoom = Math.Min(_zoom + 0.1, 3.0);
+    private void ZoomOut() => _zoom = Math.Max(_zoom - 0.1, 0.1);
+    private void ResetZoom() => _zoom = 1.0;
+
+    private IEnumerable<IGrouping<string, NodeDefinition>> FilteredNodeDefinitions =>
+        _nodeDefinitions
+            .Where(d => string.IsNullOrWhiteSpace(_searchNodeType) || 
+                       d.Name.Contains(_searchNodeType, StringComparison.OrdinalIgnoreCase) ||
+                       d.Category.Contains(_searchNodeType, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(d => d.Category)
+            .SelectMany(g => g.OrderBy(d => d.Name));
+
+    public async ValueTask DisposeAsync()
+    {
+        _executionCts?.Cancel();
+        _executionCts?.Dispose();
+        
+        if (_canvas != null)
+        {
+            await JS.InvokeVoidAsync("visualScripting.dispose", _canvas.Ref);
+        }
+    }
+
+    public record Point(double X, double Y);
+}

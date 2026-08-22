@@ -1,0 +1,182 @@
+@page "/instances"
+@inject IInstanceRepository InstanceRepository
+@inject IJobRepository JobRepository
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Instance Management</MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudTextField @bind-Value="_searchString" Placeholder="Search instances..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="_statusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    <MudSelectItem Value="InstanceStatus.Created">Created</MudSelectItem>
+                    <MudSelectItem Value="InstanceStatus.Running">Running</MudSelectItem>
+                    <MudSelectItem Value="InstanceStatus.Stopped">Stopped</MudSelectItem>
+                    <MudSelectItem Value="InstanceStatus.Error">Error</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateInstance" Class="mt-6" StartIcon="@Icons.Material.Filled.Add">Create Instance</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredInstances" Hover="true" Striped="true" Dense="true" MultiSelection="@_multiSelection" OnRowClick="@RowClicked">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Module</MudTh>
+                    <MudTh>Device</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd><MudChip Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip></MudTd>
+                    <MudTd>@context.Module?.Name</MudTd>
+                    <MudTd>@context.DeviceId</MudTd>
+                    <MudTd>@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success" @onclick="@(() => StartInstance(context))" Disabled="@(context.Status == InstanceStatus.Running)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Color="Color.Error" @onclick="@(() => StopInstance(context))" Disabled="@(context.Status != InstanceStatus.Running)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" @onclick="@(() => DeleteInstance(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@* Create Instance Dialog *@
+<MudDialog @bind-Visible="@_showCreateDialog">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Create New Instance</MudText>
+        <MudTextField @bind-Value="_newInstanceName" Label="Instance Name" HelperText="Unique name for this instance" Required="true" />
+        <MudSelect @bind-Value="_selectedModuleId" Label="Module" Required="true">
+            @foreach (var module in _availableModules)
+            {
+                <MudSelectItem Value="@module.Id">@module.Name (@module.Version)</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect @bind-Value="_selectedDeviceId" Label="Device" Required="true">
+            @foreach (var device in _availableDevices)
+            {
+                <MudSelectItem Value="@device.Id">@device.Name (@device.Type)</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@CancelCreate">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ConfirmCreate">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    List<Instance> _instances = new();
+    List<Instance> _filteredInstances = new();
+    HashSet<Instance> _selectedRows = new();
+    bool _multiSelection = false;
+    bool _isLoading = true;
+    string _searchString = "";
+    InstanceStatus? _statusFilter;
+
+    // Create dialog
+    bool _showCreateDialog = false;
+    string _newInstanceName = "";
+    Guid _selectedModuleId;
+    Guid _selectedDeviceId;
+    List<Module> _availableModules = new();
+    List<Device> _availableDevices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInstances();
+    }
+
+    async Task LoadInstances()
+    {
+        _isLoading = true;
+        _instances = await InstanceRepository.GetAllAsync(CancellationToken.None);
+        ApplyFilters();
+        _isLoading = false;
+    }
+
+    void ApplyFilters()
+    {
+        var query = _instances.AsQueryable();
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+            query = query.Where(i => i.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+        
+        if (_statusFilter.HasValue)
+            query = query.Where(i => i.Status == _statusFilter.Value);
+
+        _filteredInstances = query.ToList();
+    }
+
+    void OnSearchChanged(string value)
+    {
+        _searchString = value;
+        ApplyFilters();
+    }
+
+    void OnStatusChanged(InstanceStatus? value)
+    {
+        _statusFilter = value;
+        ApplyFilters();
+    }
+
+    void RowClicked(TableRowClickEventArgs<Instance> args)
+    {
+        // Handle row click if needed
+    }
+
+    void StartInstance(Instance instance) { /* TODO */ }
+    void StopInstance(Instance instance) { /* TODO */ }
+    void DeleteInstance(Instance instance) { /* TODO */ }
+
+    void CreateInstance()
+    {
+        _newInstanceName = "";
+        _selectedModuleId = Guid.Empty;
+        _selectedDeviceId = Guid.Empty;
+        _showCreateDialog = true;
+    }
+
+    void CancelCreate()
+    {
+        _showCreateDialog = false;
+    }
+
+    async Task ConfirmCreate()
+    {
+        var instance = new Instance(Guid.NewGuid(), _newInstanceName, InstanceStatus.Created, null);
+        // TODO: Set Module and Device
+        await InstanceRepository.AddAsync(instance, CancellationToken.None);
+        await LoadInstances();
+        _showCreateDialog = false;
+    }
+
+    Color GetStatusColor(InstanceStatus status) => status switch
+    {
+        InstanceStatus.Running => Color.Success,
+        InstanceStatus.Stopped => Color.Error,
+        InstanceStatus.Created => Color.Info,
+        InstanceStatus.Error => Color.Error,
+        _ => Color.Default
+    };
+}

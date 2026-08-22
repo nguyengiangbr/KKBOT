@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.PluginMarketplace</AssemblyName>
+    <RootNamespace>KKBOT.PluginMarketplace</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\KKBOT.Persistence.EfCore\KKBOT.Persistence.EfCore.csproj" />
+    <ProjectReference Include="..\KKBOT.Security\KKBOT.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

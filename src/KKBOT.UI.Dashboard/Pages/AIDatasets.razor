@@ -1,0 +1,500 @@
+@page "/ai/datasets"
+@inject IDatasetManager DatasetManager
+@inject ILogger<AIDatasets> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Dataset Management</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_searchString" Placeholder="Search datasets..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" Label="Search" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_tagFilter" Label="Tag" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var tag in _availableTags)
+                    {
+                        <MudSelectItem Value="@tag">@tag</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenRegisterDialog" StartIcon="@Icons.Material.Filled.Add" Class="mt-6 w-100">Register Dataset</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_filteredDatasets.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No datasets found. Register a new dataset to get started.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_filteredDatasets" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Version</MudTh>
+                    <MudTh>Samples</MudTh>
+                    <MudTh>Size</MudTh>
+                    <MudTh>Target Column</MudTh>
+                    <MudTh>Tags</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Dataset" Color="Color.Primary" Class="me-2" />
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@context.Name</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.DatasetId</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd>v@context.Version</MudTd>
+                    <MudTd>@context.SampleCount.ToString("N0")</MudTd>
+                    <MudTd>@FormatBytes(context.SizeBytes)</MudTd>
+                    <MudTd>@(context.Schema.TargetColumn ?? "N/A")</MudTd>
+                    <MudTd>
+                        @foreach (var tag in context.Tags.Take(3))
+                        {
+                            <MudChip Size="Size.Small" Class="mr-1 mb-1">@tag</MudChip>
+                        }
+                        @if (context.Tags.Count > 3)
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Default">+@(context.Tags.Count - 3)</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" @onclick="@(() => ViewDataset(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" @onclick="@(() => ValidateDataset(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" Color="Color.Info" @onclick="@(() => ViewStatistics(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" @onclick="@(() => DeleteDataset(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        </    </MudPaper>
+</MudContainer>
+
+@* Register Dataset Dialog *@
+<MudDialog @bind-Visible="@_showRegisterDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Register New Dataset</MudText>
+        <MudTextField @bind-Value "_newDatasetName" Label="Dataset Name" Required="true" HelperText="Unique identifier" />
+        <MudTextField @bind-Value "_newDatasetDisplayName" Label="Display Name" Required="true" />
+        <MudTextField @bind-Value "_newDatasetVersion" Label="Version" Required="true" HelperText="Semantic version (e.g., 1.0.0)" />
+        <MudTextField @bind-Value "_newDatasetDescription" Label="Description" Multiline="true" Rows="3" />
+        <MudTextField @bind-Value "_newDatasetSourcePath" Label="Source Path" Required="true" HelperText="Path to dataset files (local or S3/GCS path)" />
+        
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Schema Definition</MudText>
+        <MudTextField @bind-Value "_newTargetColumn" Label="Target Column (optional)" HelperText="Column name for supervised learning" />
+        
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value "_newTagInput" Label="Tags" HelperText="Comma-separated tags" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showRegisterDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RegisterDataset">Register</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Dataset Detail Dialog *@
+<MudDialog @bind-Visible="@_showDetailDialog" MaxWidth="MaxWidth.Large" FullWidth="true">
+    <DialogContent>
+        @if (_selectedDataset != null)
+        {
+            <div class="dataset-detail">
+                <div class="d-flex align-center mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Dataset" Size="@(IconSize.Large * 2)" Color="Color.Primary" Class="me-4" />
+                    <div>
+                        <MudText Typo="Typo.h5" Class="mb-1">@_selectedDataset.DisplayName ?? _selectedDataset.Name</MudText>
+                        <MudChip Color="Color.Primary" Size="Size.Small">v@_selectedDataset.Version</MudChip>
+                    </div>
+                </div>
+
+                <MudDivider Class="my-3" />
+
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-3" Elevation="1">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Basic Info</MudText>
+                            <MudGrid>
+                                <MudItem xs="6"><MudText Typo="Typo.caption">Dataset ID</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedDataset.DatasetId</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.caption">Samples</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedDataset.SampleCount.ToString("N0")</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.caption">Size</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.body2">@FormatBytes(_selectedDataset.SizeBytes)</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.caption">Created</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedDataset.CreatedAt.ToString("g")</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.caption">Created By</MudText></MudItem>
+                                <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedDataset.CreatedBy</MudText></MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudPaper Class="pa-3" Elevation="1">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Source & Schema</MudText>
+                            <MudText Typo="Typo.caption">Source Path</MudText>
+                            <MudText>@_selectedDataset.SourcePath</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-2">Target Column</MudText>
+                            <MudText>@(_selectedDataset.Schema.TargetColumn ?? "Not specified")</MudText>
+                            <MudText Typo="Typo.caption" Class="mt-2">Columns (@_selectedDataset.Schema.Columns.Count)</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @if (_selectedDataset.Schema.Columns.Count > 0)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.h6" Class="mb-3">Schema Columns</MudText>
+                    <MudTable Items="@_selectedDataset.Schema.Columns.Values" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Name</MudTh>
+                            <MudTh>Data Type</MudTh>
+                            <MudTh>Nullable</MudTh>
+                            <MudTh>Statistics</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Name</MudTd>
+                            <MudTd><MudChip Size="Size.Small">@context.DataType</MudChip></MudTd>
+                            <MudTd>@(context.IsNullable ? "Yes" : "No")</MudTd>
+                            <MudTd>
+                                @foreach (var stat in context.Statistics)
+                                {
+                                    <MudChip Size="Size.Small" Class="mr-1 mb-1" Variant="Variant.Outlined">@stat.Key: @stat.Value</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+
+                @if (_statistics != null)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.h6" Class="mb-3">Statistics</MudText>
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-3" Elevation="1">
+                                <MudText Typo="Typo.h6" Class="mb-0">@_statistics.TotalSamples.ToString("N0")</MudText>
+                                <MudText Typo="Typo.caption">Total Samples</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-3" Elevation="1">
+                                <MudText Typo="Typo.h6" Class="mb-0">@_statistics.TotalFeatures</MudText>
+                                <MudText Typo="Typo.caption">Features</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudPaper Class="pa-3" Elevation="1">
+                                <MudText Typo="Typo.h6" Class="mb-0">@(_statistics.MissingValueRatio * 100).ToString("F1")%</MudText>
+                                <MudText Typo="Typo.caption">Missing Values</MudText>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDetailDialog = false">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Validation Result Dialog *@
+<MudDialog @bind-Visible="@_showValidationDialog" MaxWidth="MaxWidth.Medium">
+    <DialogContent>
+        @if (_validationResult != null)
+        {
+            <MudText Typo="Typo.h6">Validation Result: @(_validationResult.IsValid ? "Valid" : "Invalid")</MudText>
+            
+            <MudChip Color="@(_validationResult.IsValid ? Color.Success : Color.Error)" Size="Size.Medium" Class="mb-3">
+                @(_validationResult.IsValid ? "✓ Valid" : "✗ Invalid")
+            </MudChip>
+
+            @if (_validationResult.Errors.Count > 0)
+            {
+                <MudText Typo="Typo.h6" Class="mt-3 mb-2">Errors (@_validationResult.Errors.Count)</MudText>
+                <MudList>
+                    @foreach (var error in _validationResult.Errors.Take(20))
+                    {
+                        <MudListItem>
+                            <MudText Typo="Typo.body2">@error.Message</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@(error.Column != "" ? $"Column: {error.Column}" : "") @(error.Row.HasValue ? $"Row: {error.Row}" : "")</MudText>
+                        </MudListItem>
+                    }
+                    @if (_validationResult.Errors.Count > 20)
+                    {
+                        <MudListItem>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">... and @(_validationResult.Errors.Count - 20) more errors</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+
+            @if (_validationResult.Warnings.Count > 0)
+            {
+                <MudText Typo="Typo.h6" Class="mt-3 mb-2">Warnings (@_validationResult.Warnings.Count)</MudText>
+                <MudList>
+                    @foreach (var warning in _validationResult.Warnings.Take(10))
+                    {
+                        <MudListItem>
+                            <MudText Typo="Typo.body2">@warning.Message</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@(warning.Column != "" ? $"Column: {warning.Column}" : "")</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+
+            @if (_validationResult.Statistics.TotalSamples > 0)
+            {
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.h6" Class="mb-2">Statistics</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-2" Elevation="1">
+                            <MudText Typo="Typo.h6" Class="mb-0">@_validationResult.Statistics.TotalSamples.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption">Samples</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-2" Elevation="1">
+                            <MudText Typo="Typo.h6" Class="mb-0">@_validationResult.Statistics.TotalFeatures</MudText>
+                            <MudText Typo="Typo.caption">Features</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-2" Elevation="1">
+                            <MudText Typo="Typo.h6" Class="mb-0">@(_validationResult.Statistics.MissingValueRatio * 100).ToString("F1")%</MudText>
+                            <MudText Typo="Typo.caption">Missing</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showValidationDialog = false">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Statistics Dialog *@
+<MudDialog @bind-Visible="@_showStatsDialog" MaxWidth="MaxWidth.Medium">
+    <DialogContent>
+        @if (_statistics != null)
+        {
+            <MudText Typo="Typo.h6">Dataset Statistics</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_statistics.TotalSamples.ToString("N0")</MudText>
+                        <MudText Typo="Typo.caption">Total Samples</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_statistics.TotalFeatures</MudText>
+                        <MudText Typo="Typo.caption">Features</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@(_statistics.MissingValueRatio * 100).ToString("F1")%</MudText>
+                        <MudText Typo="Typo.caption">Missing Values</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @if (_statistics.FeatureStats.Count > 0)
+            {
+                <MudDivider Class="my-3" />
+                <MudText Typo="Typo.h6" Class="mb-2">Feature Statistics</MudText>
+                <MudTable Items="@_statistics.FeatureStats" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Feature</MudTh>
+                        <MudTh>Statistic</MudTh>
+                        <MudTh>Value</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Key</MudTd>
+                        <MudTd>@context.Value.Key</MudTd>
+                        <MudTd>@context.Value.Value</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showStatsDialog = false">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    List<Dataset> _datasets = new();
+    List<Dataset> _filteredDatasets = new();
+    List<string> _availableTags = new();
+    bool _isLoading = true;
+    string _searchString = "";
+    string _tagFilter = "";
+
+    // Dialogs
+    bool _showRegisterDialog = false;
+    string _newDatasetName = "";
+    string _newDatasetDisplayName = "";
+    string _newDatasetVersion = "1.0.0";
+    string _newDatasetDescription = "";
+    string _newDatasetSourcePath = "";
+    string _newDatasetDescription2 = "";
+    string _newTargetColumn = "";
+    string _newTagInput = "";
+
+    bool _showDetailDialog = false;
+    Dataset? _selectedDataset;
+    DatasetStatistics? _statistics;
+    DatasetValidationResult? _validationResult;
+
+    bool _showValidationDialog = false;
+    bool _showStatsDialog = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDatasets();
+    }
+
+    async Task LoadDatasets()
+    {
+        _isLoading = true;
+        try
+        {
+            _datasets = (await DatasetManager.ListDatasetsAsync(new DatasetQuery(), CancellationToken.None)).ToList();
+            _filteredDatasets = _datasets.ToList();
+            
+            _availableTags = _datasets
+                .SelectMany(d => d.Tags.Keys)
+                .Distinct()
+                .OrderBy(t => t)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load datasets");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    void ApplyFilters()
+    {
+        var query = _datasets.AsQueryable();
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            query = query.Where(d => d.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) 
+                || d.DatasetId.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        if (!string.IsNullOrEmpty(_tagFilter))
+        {
+            query = query.Where(d => d.Tags.ContainsKey(_tagFilter));
+        }
+
+        _filteredDatasets = query.OrderByDescending(d => d.CreatedAt).ToList();
+    }
+
+    async Task RegisterDataset()
+    {
+        var tags = _newTagInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToDictionary(t => t, t => "");
+
+        var schema = new DatasetSchema(
+            new Dictionary<string, DatasetColumn>(), // Would be parsed from UI
+            _newTargetColumn
+        );
+
+        var request = new RegisterDatasetRequest(
+            _newDatasetName,
+            _newDatasetVersion,
+            _newDatasetDescription,
+            _newDatasetSourcePath,
+            schema,
+            tags
+        );
+
+        try
+        {
+            await DatasetManager.RegisterDatasetAsync(request, CancellationToken.None);
+            await LoadDatasets();
+            _showRegisterDialog = false;
+            
+            // Reset form
+            _newDatasetName = "";
+            _newDatasetDisplayName = "";
+            _newDatasetVersion = "1.0.0";
+            _newDatasetDescription = "";
+            _newDatasetSourcePath = "";
+            _newTargetColumn = "";
+            _newTagInput = "";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to register dataset");
+        }
+    }
+
+    async Task ViewDataset(Dataset dataset)
+    {
+        _selectedDataset = dataset;
+        _showDetailDialog = true;
+    }
+
+    async Task ValidateDataset(Dataset dataset)
+    {
+        _validationResult = await DatasetManager.ValidateDatasetAsync(dataset.DatasetId, dataset.Version, CancellationToken.None);
+        _showValidationDialog = true;
+    }
+
+    async Task ViewStatistics(Dataset dataset)
+    {
+        _statistics = await DatasetManager.ComputeStatisticsAsync(dataset.DatasetId, dataset.Version, CancellationToken.None);
+        _showStatsDialog = true;
+    }
+
+    async Task DeleteDataset(Dataset dataset)
+    {
+        var confirmed = await Task.FromResult(true); // In real app, show confirmation dialog
+        if (confirmed)
+        {
+            await DatasetManager.DeleteDatasetAsync(dataset.DatasetId, dataset.Version, CancellationToken.None);
+            await LoadDatasets();
+        }
+    }
+
+    string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int i = 0;
+        double size = bytes;
+        while (size >= 1024 && i < suffixes.Length - 1)
+        {
+            size /= 1024;
+            i++;
+        }
+        return $"{size:F1} {suffixes[i]}";
+    }
+}

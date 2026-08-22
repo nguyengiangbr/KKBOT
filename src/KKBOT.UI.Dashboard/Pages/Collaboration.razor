@@ -1,0 +1,201 @@
+@page "/collaboration"
+@inject ICollaborationSessionService SessionService
+@inject IParticipantService ParticipantService
+@inject IPresenceService PresenceService
+@inject IChatService ChatService
+@inject IAnnotationService AnnotationService
+@inject IRecordingService RecordingService
+@inject ILogger<Collaboration> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Real-time Collaboration</MudText>
+
+    <MudTabs>
+        <MudTabPanel Text="Sessions">
+            <SessionsTab SessionService="SessionService" />
+        </MudTabPanel>
+        <MudTabPanel Text="Active Session">
+            <ActiveSessionTab SessionService="SessionService" ParticipantService="ParticipantService" />
+        </MudTabPanel>
+        <MudTabPanel Text="Presence">
+            <PresenceTab PresenceService="PresenceService" />
+        </MudTabPanel>
+        <MudTabPanel Text="Recordings">
+            <RecordingsTab RecordingService="RecordingService" />
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    // Sessions Tab Component
+    class SessionsTab : ComponentBase
+    {
+        [Inject] public ICollaborationSessionService SessionService { get; set; } = default!;
+        [Inject] protected ILogger<SessionsTab> Logger { get; set; } = default!;
+
+        private List<CollaborationSession> _sessions = new();
+        private bool _isLoading = true;
+        private string _searchString = "";
+        private SessionStatus? _statusFilter;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadSessions();
+        }
+
+        async Task LoadSessions()
+        {
+            _isLoading = true;
+            try
+            {
+                var filter = new SessionFilter
+                {
+                    Status = _statusFilter,
+                    Page = 1,
+                    PageSize = 20
+                };
+                _sessions = await SessionService.GetSessionsAsync(filter, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load sessions");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        async Task CreateSession()
+        {
+            var request = new CreateSessionRequest
+            {
+                Name = "New Session",
+                Description = "A new collaboration session",
+                InstanceId = Guid.NewGuid(),
+                Type = SessionType.CollaborativeControl
+            };
+
+            var session = await SessionService.CreateSessionAsync(request, "current-user", CancellationToken.None);
+            // Refresh
+            await LoadSessions();
+        }
+    }
+
+    // Active Session Tab Component
+    class ActiveSessionTab : ComponentBase
+    {
+        [Inject] protected ICollaborationSessionService SessionService { get; set; } = default!;
+        [Inject] protected IParticipantService ParticipantService { get; set; } = default!;
+        [Inject] protected IChatService ChatService { get; set; } = default!;
+        [Inject] protected IAnnotationService AnnotationService { get; set; } = default!;
+        [Inject] protected IRecordingService RecordingService { get; set; } = default!;
+        [Inject] protected ILogger<ActiveSessionTab> Logger { get; set; } = default!;
+
+        private CollaborationSession? _selectedSession;
+        private List<SessionParticipant> _participants = new();
+        private List<ChatMessage> _messages = new();
+        private List<ScreenAnnotation> _annotations = new();
+        private string _messageInput = "";
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadActiveSession();
+        }
+
+        async Task LoadActiveSession()
+        {
+            // In a real implementation, this would get the currently active session
+            // For now, we'll just load the first active session
+            var filter = new SessionFilter { Status = SessionStatus.Active, PageSize = 1 };
+            var sessions = await SessionService.GetSessionsAsync(new SessionFilter { Status = SessionStatus.Active, PageSize = 1 }, CancellationToken.None);
+            _selectedSession = sessions.FirstOrDefault();
+
+            if (_selectedSession != null)
+            {
+                await LoadSessionData();
+            }
+        }
+
+        async Task LoadSessionData()
+        {
+            if (_selectedSession == null) return;
+
+            _participants = await ParticipantService.GetParticipantsAsync(_selectedSession.Id, CancellationToken.None);
+            _messages = await ChatService.GetMessagesAsync(_selectedSession.Id, new ChatFilter(), CancellationToken.None);
+            _annotations = await AnnotationService.GetAnnotationsAsync(_selectedSession.Id, new AnnotationFilter(), CancellationToken.None);
+        }
+    }
+
+    // Presence Tab Component
+    class PresenceTab : ComponentBase
+    {
+        [Inject] protected IPresenceService PresenceService { get; set; } = default!;
+        [Inject] protected ILogger<PresenceTab> Logger { get; set; } = default!;
+
+        private List<PresenceInfo> _presences = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadPresences();
+        }
+
+        async Task LoadPresences()
+        {
+            _isLoading = true;
+            try
+            {
+                _presences = await PresenceService.GetPresencesAsync("default", new PresenceFilter(), CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load presences");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Recordings Tab Component
+    class RecordingsTab : ComponentBase
+    {
+        [Inject] protected IRecordingService RecordingService { get; set; } = default!;
+        [Inject] protected ILogger<RecordingsTab> Logger { get; set; } = default!;
+
+        private List<SessionRecording> _recordings = new();
+        private bool _isLoading = true;
+        private RecordingStatus? _statusFilter;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadRecordings();
+        }
+
+        async Task LoadRecordings()
+        {
+            _isLoading = true;
+            try
+            {
+                var filter = new RecordingFilter
+                {
+                    Status = _statusFilter,
+                    Page = 1,
+                    PageSize = 20
+                };
+                _recordings = await RecordingService.GetRecordingsAsync("current-user", filter, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load recordings");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+}

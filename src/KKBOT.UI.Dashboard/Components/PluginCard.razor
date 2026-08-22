@@ -1,0 +1,71 @@
+@* Plugin Card Component *@
+<div class="plugin-card mud-card mud-elevation-2 h-100 d-flex flex-column" style="transition: transform 0.2s, box-shadow 0.2s;">
+    <div class="plugin-header" style="padding: 16px; border-bottom: 1px solid var(--mud-palette-divider);">
+        <div class="d-flex align-center">
+            @if (!string.IsNullOrEmpty(Plugin.IconUrl))
+            {
+                <img src="@Plugin.IconUrl" alt="@Plugin.Name" class="plugin-icon" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;" />
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Extension" Size="Size.Large" Class="plugin-icon mud-primary-text" Style="width: 48px; height: 48px;" />
+            }
+            <div class="ml-3 flex-grow-1 min-width-0">
+                <MudText Typo="Typo.subtitle1" Class="mb-1 mud-text-truncate">@Plugin.Name</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">by @Plugin.Author</MudText>
+            </div>
+            @if (Plugin.Verified)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Primary" Size="Size.Medium" Class="ml-2" Title="Verified Publisher" />
+            }
+        </div>
+    </div>
+
+    <div class="plugin-body pa-3 flex-grow-1 d-flex flex-column">
+        <MudText Typo="Typo.body2" Class="mb-3" Style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">@Plugin.Description</MudText>
+
+        <div class="plugin-meta mb-3">
+            <MudChip Size="Size.Small" Color="Color.Primary" Class="mr-1 mb-1">v@Plugin.Version</MudChip>
+            @foreach (var tag in Plugin.Tags.Take(3))
+            {
+                <MudChip Size="Size.Small" Variant="Variant.Outlined" Class="mr-1 mb-1">@tag</MudChip>
+            }
+            @if (Plugin.Tags.Length > 3)
+            {
+                <MudChip Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">+@(Plugin.Tags.Length - 3) more</MudChip>
+            }
+        </div>
+
+        <div class="plugin-stats d-flex justify-space-between mb-3 text-caption mud-text-secondary">
+            <span><MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" Class="align-middle mr-1" /> @Plugin.DownloadCount.ToString("N0")</span>
+            @if (Plugin.Rating > 0)
+            {
+                <span><MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Class="align-middle mr-1 mud-warning-text" /> @Plugin.Rating.ToString("0.0") (@Plugin.RatingCount)</span>
+            }
+        </div>
+    </div>
+
+    <div class="plugin-footer pa-3 pt-0 d-flex justify-space-between align-center" style="border-top: 1px solid var(--mud-palette-divider); margin-top: auto;">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => OnViewDetails?.Invoke(Plugin))" Class="flex-grow-1 me-2" FullWidth="true">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" /> Details
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnInstall?.Invoke(Plugin))" Class="flex-grow-1" FullWidth="true" Disabled="@IsInstalled">
+            @(IsInstalled ? "Installed" : "Install")
+            @if (!IsInstalled)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" Class="ml-1" />
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="ml-1" />
+            }
+        </MudButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public PluginRegistryEntry Plugin { get; set; } = default!;
+    [Parameter] public EventCallback<PluginRegistryEntry> OnInstall { get; set; }
+    [Parameter] public EventCallback<PluginRegistryEntry> OnViewDetails { get; set; }
+    [Parameter] public bool IsInstalled { get; set; } = false;
+}

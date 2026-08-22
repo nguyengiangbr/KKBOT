@@ -1,0 +1,408 @@
+@page "/marketplace/analytics"
+@inject HttpClient Http
+@inject ILogger<MarketplaceAnalytics> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Marketplace Analytics</MudText>
+
+    <MudTabs>
+        <MudTabPanel Text="Overview">
+            <OverviewTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Trends">
+            <TrendsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Plugins">
+            <PluginsAnalyticsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Publishers">
+            <PublishersAnalyticsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Revenue">
+            <RevenueAnalyticsTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Platform Health">
+            <PlatformHealthTab />
+        </MudTabPanel>
+        <MudTabPanel Text="Moderation">
+            <ModerationAnalyticsTab />
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    // Overview Tab Component
+    class OverviewTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<OverviewTab> Logger { get; set; } = default!;
+
+        private MarketplaceOverview? _overview;
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _overview = await Http.GetFromJsonAsync<MarketplaceOverview>("api/v1/analytics/overview");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load overview");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Trends Tab Component
+    class TrendsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<TrendsTab> Logger { get; set; } = default!;
+
+        private MarketplaceTrends? _trends;
+        private TrendPeriod _selectedPeriod = TrendPeriod.Last30Days;
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _trends = await Http.GetFromJsonAsync<MarketplaceTrends>($"api/v1/analytics/trends?period={_selectedPeriod}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load trends");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        async Task OnPeriodChanged(TrendPeriod period)
+        {
+            _selectedPeriod = period;
+            await LoadData();
+        }
+    }
+
+    // Plugins Analytics Tab Component
+    class PluginsAnalyticsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<PluginsAnalyticsTab> Logger { get; set; } = default!;
+
+        private List<PluginAnalyticsSummary> _topPlugins = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _topPlugins = await Http.GetFromJsonAsync<List<PluginAnalyticsSummary>>("api/v1/analytics/plugins/top") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load plugin analytics");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Publishers Analytics Tab Component
+    class PublishersAnalyticsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<PublishersAnalyticsTab> Logger { get; set; } = default!;
+
+        private List<PublisherAnalyticsSummary> _topPublishers = new();
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _topPublishers = await Http.GetFromJsonAsync<List<PublisherAnalyticsSummary>>("api/v1/analytics/publishers/top") ?? new();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load publisher analytics");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Revenue Analytics Tab Component
+    class RevenueAnalyticsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<RevenueAnalyticsTab> Logger { get; set; } = default!;
+
+        private RevenueAnalytics? _revenue;
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _revenue = await Http.GetFromJsonAsync<RevenueAnalytics>("api/v1/analytics/revenue");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load revenue analytics");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    // Platform Health Tab Component
+    class PlatformHealthTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<PlatformHealthTab> Logger { get; set; } = default!;
+
+        private PlatformHealthMetrics? _health;
+        private bool _isLoading = true;
+        private System.Timers.Timer? _refreshTimer;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+            _refreshTimer = new System.Timers.Timer(30000);
+            _refreshTimer.Elapsed += async (sender, e) => await InvokeAsync(LoadData);
+            _refreshTimer.Start();
+        }
+
+        async Task LoadData()
+        {
+            try
+            {
+                _health = await Http.GetFromJsonAsync<PlatformHealthMetrics>("api/v1/analytics/health");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load health metrics");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        public void Dispose()
+        {
+            _refreshTimer?.Stop();
+            _refreshTimer?.Dispose();
+        }
+    }
+
+    // Moderation Analytics Tab Component
+    class ModerationAnalyticsTab : ComponentBase
+    {
+        [Inject] protected HttpClient Http { get; set; } = default!;
+        [Inject] protected ILogger<ModerationAnalyticsTab> Logger { get; set; } = default!;
+
+        private ModerationAnalytics? _moderation;
+        private bool _isLoading = true;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await LoadData();
+        }
+
+        async Task LoadData()
+        {
+            _isLoading = true;
+            try
+            {
+                _moderation = await Http.GetFromJsonAsync<ModerationAnalytics>("api/v1/analytics/moderation");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load moderation analytics");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+    }
+}
+
+// DTOs for the analytics components
+public record MarketplaceOverview
+{
+    public long TotalPlugins { get; init; }
+    public long PublishedPlugins { get; init; }
+    public long TotalPublishers { get; init; }
+    public long VerifiedPublishers { get; init; }
+    public long TotalDownloads { get; init; }
+    public long MonthlyActiveUsers { get; init; }
+    public double AverageRating { get; init; }
+    public long TotalReviews { get; init; }
+    public long PendingModeration { get; init; }
+    public double ConversionRate { get; init; }
+    public Dictionary<string, long> PluginsByCategory { get; init; } = new();
+    public Dictionary<string, long> PluginsByStatus { get; init; } = new();
+}
+
+public enum TrendPeriod
+{
+    Last7Days,
+    Last30Days,
+    Last90Days,
+    LastYear,
+    AllTime
+}
+
+public record MarketplaceTrends
+{
+    public TrendPeriod Period { get; init; }
+    public List<TrendDataPoint> PluginGrowth { get; init; } = new();
+    public List<TrendDataPoint> DownloadTrends { get; init; } = new();
+    public List<TrendDataPoint> PublisherGrowth { get; init; } = new();
+    public List<TrendDataPoint> RevenueTrends { get; init; } = new();
+    public List<TrendDataPoint> ReviewTrends { get; init; } = new();
+    public List<TrendDataPoint> ActiveUsers { get; init; } = new();
+}
+
+public record TrendDataPoint
+{
+    public DateTime Date { get; init; }
+    public double Value { get; init; }
+    public string? Label { get; init; }
+}
+
+public record PluginAnalyticsSummary
+{
+    public string PluginId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public long TotalDownloads { get; init; }
+    public double AverageRating { get; init; }
+    public int ReviewCount { get; init; }
+    public double GrowthRate { get; init; }
+}
+
+public record PublisherAnalyticsSummary
+{
+    public Guid PublisherId { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public int TotalPlugins { get; init; }
+    public long TotalDownloads { get; init; }
+    public decimal Revenue { get; init; }
+    public double AverageRating { get; init; }
+}
+
+public record RevenueAnalytics
+{
+    public decimal TotalRevenue { get; init; }
+    public decimal MonthlyRevenue { get; init; }
+    public decimal PlatformFees { get; init; }
+    public decimal PublisherPayouts { get; init; }
+    public List<TrendDataPoint> RevenueTrends { get; init; } = new();
+    public Dictionary<string, decimal> RevenueByCategory { get; init; } = new();
+}
+
+public record PlatformHealthMetrics
+{
+    public double ApiUptime { get; init; }
+    public double AverageResponseTimeMs { get; init; }
+    public double ErrorRate { get; init; }
+    public long RequestsPerMinute { get; init; }
+    public double CpuUsagePercent { get; init; }
+    public double MemoryUsagePercent { get; init; }
+    public double DiskUsagePercent { get; init; }
+    public long ActiveConnections { get; init; }
+    public long QueueDepth { get; init; }
+    public Dictionary<string, ServiceHealth> ServiceHealth { get; init; } = new();
+    public List<IncidentSummary> RecentIncidents { get; init; } = new();
+}
+
+public record ServiceHealth
+{
+    public string Name { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public double LatencyMs { get; init; }
+    public double ErrorRate { get; init; }
+    public DateTime LastCheck { get; init; }
+}
+
+public record IncidentSummary
+{
+    public string Id { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Severity { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public DateTime StartedAt { get; init; }
+    public DateTime? ResolvedAt { get; init; }
+}
+
+public record ModerationAnalytics
+{
+    public long TotalQueued { get; init; }
+    public long Pending { get; init; }
+    public long UnderReview { get; init; }
+    public long ApprovedToday { get; init; }
+    public long RejectedToday { get; init; }
+    public long Escalated { get; init; }
+    public TimeSpan AverageReviewTime { get; init; }
+    public double ApprovalRate { get; init; }
+    public Dictionary<string, long> ByEntityType { get; init; } = new();
+    public Dictionary<string, long> ByPriority { get; init; } = new();
+    public List<ModeratorPerformance> ModeratorPerformance { get; init; } = new();
+    public List<TrendDataPoint> QueueTrends { get; init; } = new();
+}
+
+public record ModeratorPerformance
+{
+    public string ModeratorId { get; init; } = string.Empty;
+    public string ModeratorName { get; init; } = string.Empty;
+    public long ItemsReviewed { get; init; }
+    public long Approved { get; init; }
+    public long Rejected { get; init; }
+    public TimeSpan AverageReviewTime { get; init; }
+    public double AccuracyScore { get; init; }
+}

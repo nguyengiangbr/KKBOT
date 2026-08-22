@@ -1,0 +1,415 @@
+@page "/users"
+@inject IdentityService IdentityService
+@inject ILogger<Users> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">User Management</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_searchString" Placeholder="Search users..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" Label="Search" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="_statusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    <MudSelectItem Value="true">Active</MudSelectItem>
+                    <MudSelectItem Value="false">Inactive</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_roleFilter" Label="Role" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    <MudSelectItem Value="SuperAdmin">SuperAdmin</MudSelectItem>
+                    <MudSelectItem Value="TenantAdmin">TenantAdmin</MudSelectItem>
+                    <MudSelectItem Value="Operator">Operator</MudSelectItem>
+                    <MudSelectItem Value="Viewer">Viewer</MudSelectItem>
+                    <MudSelectItem Value="Developer">Developer</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog" StartIcon="@Icons.Material.Filled.PersonAdd" Class="mt-6 w-100">Add User</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredUsers" Hover="true" Striped="true" Dense="true" MultiSelection="@_multiSelection" OnRowClick="@RowClicked">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Roles</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Tenant</MudTh>
+                    <MudTh>Last Login</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <div class="d-flex align-center">
+                            @if (!string.IsNullOrEmpty(context.AvatarUrl))
+                            {
+                                <img src="@context.AvatarUrl" alt="" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;" />
+                            }
+                            else
+                            {
+                                <MudAvatar Class="me-2">@GetInitials(context.FirstName, context.LastName)</MudAvatar>
+                            }
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@context.FullName</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.UserName</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd>@context.Email</MudTd>
+                    <MudTd>
+                        @foreach (var role in _userRoles.GetValueOrDefault(context.Id, Array.Empty<string>()))
+                        {
+                            <MudChip Size="Size.Small" Color="@GetRoleColor(role)" Class="mr-1 mb-1">@role</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd><MudChip Color="@(context.IsActive ? Color.Success : Color.Error)" Size="Size.Small">@(context.IsActive ? "Active" : "Inactive")</MudChip></MudTd>
+                    <MudTd>@context.TenantId</MudTd>
+                    <MudTd>@(context.LastLoginAt?.ToString("g") ?? "Never")</MudTd>
+                    <MudTd>@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" @onclick="@(() => EditUser(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Info" @onclick="@(() => ResetPassword(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Size="Size.Small" Color="Color.Error" @onclick="@(() => DeleteUser(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@* Create/Edit User Dialog *@
+<MudDialog @bind-Visible="@_showUserDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">@(_editingUser == null ? "Create New User" : "Edit User")</MudText>
+        <MudTextField @bind-Value="_userEmail" Label="Email" Required="true" For="@(() => _userEmail)" />
+        <MudTextField @bind-Value "_userFirstName" Label="First Name" Required="true" For="@(() => _userFirstName)" />
+        <MudTextField @bind-Value "_userLastName" Label="Last Name" Required="true" For="@(() => _userLastName)" />
+        @if (_editingUser == null)
+        {
+            <MudTextField @bind-Value "_userPassword" Label="Password" InputType="InputType.Password" Required="true" HelperText="Minimum 8 characters with upper, lower, number, special" For="@(() => _userPassword)" />
+        }
+        <MudSelect @bind-Value "_userTenantId" Label="Tenant" Required="true">
+            @foreach (var tenant in _tenants)
+            {
+                <MudSelectItem Value="@tenant.Id">@tenant.DisplayName (@tenant.Name)</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect @bind-Value "_userRoles" Label="Roles" MultiSelection="true" Required="true">
+            <MudSelectItem Value="SuperAdmin">SuperAdmin</MudSelectItem>
+            <MudSelectItem Value="TenantAdmin">TenantAdmin</MudSelectItem>
+            <MudSelectItem Value="Operator">Operator</MudSelectItem>
+            <MudSelectItem Value="Viewer">Viewer</MudSelectItem>
+            <MudSelectItem Value="Developer">Developer</MudSelectItem>
+        </MudSelect>
+        <MudSwitch @bind-Checked "_userIsActive" Label="Active" Color="Color.Success" Class="mt-2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelUserDialog">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">@(_editingUser == null ? "Create" : "Save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Reset Password Dialog *@
+<MudDialog @bind-Visible="@_showResetPasswordDialog" MaxWidth="MaxWidth.Small">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Reset Password for @(_resetPasswordUser?.FullName ?? "User")</MudText>
+        <MudTextField @bind-Value "_newPassword" Label="New Password" InputType="InputType.Password" Required="true" HelperText="Minimum 8 characters" />
+        <MudTextField @bind-Value "_confirmPassword" Label="Confirm Password" InputType="InputType.Password" Required="true" />
+        @if (_passwordError != null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_passwordError</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showResetPasswordDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmResetPassword">Reset</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Delete Confirmation Dialog *@
+<MudDialog @bind-Visible="@_showDeleteDialog" MaxWidth="MaxWidth.Small">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Delete User</MudText>
+        <MudText Typo="Typo.body2">Are you sure you want to delete @(_deleteUser?.FullName)? This action cannot be undone.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDeleteDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ConfirmDelete">Delete</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    List<ApplicationUser> _users = new();
+    Dictionary<Guid, string[]> _userRoles = new();
+    List<ApplicationUser> _filteredUsers = new();
+    List<ApplicationTenant> _tenants = new();
+    bool _isLoading = true;
+    string _searchString = "";
+    bool? _statusFilter;
+    string _roleFilter = "";
+    bool _multiSelection = false;
+    HashSet<ApplicationUser> _selectedRows = new();
+
+    // Dialogs
+    bool _showUserDialog = false;
+    ApplicationUser? _editingUser;
+    string _userEmail = "";
+    string _userFirstName = "";
+    string _userLastName = "";
+    string _userPassword = "";
+    Guid _userTenantId;
+    List<string> _userRoles = new();
+    bool _userIsActive = true;
+
+    bool _showResetPasswordDialog = false;
+    ApplicationUser? _resetPasswordUser;
+    string _newPassword = "";
+    string _confirmPassword = "";
+    string? _passwordError;
+
+    bool _showDeleteDialog = false;
+    ApplicationUser? _deleteUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            _users = (await IdentityService.GetUsersAsync(CancellationToken.None)).ToList();
+            
+            // Load roles for each user
+            foreach (var user in _users)
+            {
+                var roles = await IdentityService.GetUserRolesAsync(user.Id, CancellationToken.None);
+                _userRoles[user.Id] = roles.ToArray();
+            }
+
+            _tenants = (await IdentityService.GetTenantsAsync(CancellationToken.None)).ToList();
+            
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load users");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    void ApplyFilters()
+    {
+        var query = _users.AsQueryable();
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            query = query.Where(u => 
+                u.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                u.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                u.UserName.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        if (_statusFilter.HasValue)
+            query = query.Where(u => u.IsActive == _statusFilter.Value);
+        
+        if (!string.IsNullOrEmpty(_roleFilter))
+            query = query.Where(u => _userRoles.GetValueOrDefault(u.Id, Array.Empty<string>()).Contains(_roleFilter));
+
+        _filteredUsers = query.ToList();
+    }
+
+    void OpenCreateDialog()
+    {
+        _editingUser = null;
+        _userEmail = "";
+        _userFirstName = "";
+        _userLastName = "";
+        _userPassword = "";
+        _userTenantId = _tenants.FirstOrDefault()?.Id ?? Guid.Empty;
+        _userRoles = new() { "Viewer" };
+        _userIsActive = true;
+        _showUserDialog = true;
+    }
+
+    void EditUser(ApplicationUser user)
+    {
+        _editingUser = user;
+        _userEmail = user.Email ?? "";
+        _userFirstName = user.FirstName;
+        _userLastName = user.LastName;
+        _userPassword = "";
+        _userTenantId = user.TenantId ?? Guid.Empty;
+        _userRoles = _userRoles.GetValueOrDefault(user.Id, Array.Empty<string>()).ToList();
+        _userIsActive = user.IsActive;
+        _showUserDialog = true;
+    }
+
+    async Task SaveUser()
+    {
+        if (string.IsNullOrWhiteSpace(_userEmail) || string.IsNullOrWhiteSpace(_userFirstName) || string.IsNullOrWhiteSpace(_userLastName))
+        {
+            // Show validation error
+            return;
+        }
+
+        if (_editingUser == null && string.IsNullOrWhiteSpace(_userPassword))
+        {
+            return;
+        }
+
+        if (_editingUser == null)
+        {
+            var request = new CreateUserRequest(
+                _userEmail, _userPassword, _userFirstName, _userLastName, _userTenantId, _userRoles.FirstOrDefault());
+            
+            var result = await IdentityService.CreateUserAsync(request, CancellationToken.None);
+            
+            if (result.Succeeded)
+            {
+                // Add additional roles
+                var createdUser = await IdentityService.GetUserByEmailAsync(_userEmail, CancellationToken.None);
+                if (createdUser != null)
+                {
+                    foreach (var role in _userRoles.Skip(1))
+                    {
+                        await IdentityService.AddToRoleAsync(createdUser.Id, role, CancellationToken.None);
+                    }
+                }
+                
+                await LoadData();
+                _showUserDialog = false;
+            }
+        }
+        else
+        {
+            var request = new UpdateUserRequest(
+                _userEmail, _userFirstName, _userLastName, null, null, null, _userIsActive);
+            
+            var result = await IdentityService.UpdateUserAsync(_editingUser.Id, request, CancellationToken.None);
+            
+            if (result.Succeeded)
+            {
+                // Update roles
+                var currentRoles = _userRoles.GetValueOrDefault(_editingUser.Id, Array.Empty<string>());
+                var toAdd = _userRoles.Except(currentRoles);
+                var toRemove = currentRoles.Except(_userRoles);
+                
+                foreach (var role in toAdd)
+                    await IdentityService.AddToRoleAsync(_editingUser.Id, role, CancellationToken.None);
+                
+                foreach (var role in toRemove)
+                    await IdentityService.RemoveFromRoleAsync(_editingUser.Id, role, CancellationToken.None);
+                
+                await LoadData();
+                _showUserDialog = false;
+            }
+        }
+    }
+
+    void CancelUserDialog()
+    {
+        _showUserDialog = false;
+        _editingUser = null;
+    }
+
+    void ResetPassword(ApplicationUser user)
+    {
+        _resetPasswordUser = user;
+        _newPassword = "";
+        _confirmPassword = "";
+        _passwordError = null;
+        _showResetPasswordDialog = true;
+    }
+
+    async Task ConfirmResetPassword()
+    {
+        if (_resetPasswordUser == null) return;
+        
+        if (_newPassword != _confirmPassword)
+        {
+            _passwordError = "Passwords do not match";
+            return;
+        }
+
+        if (_newPassword.Length < 8)
+        {
+            _passwordError = "Password must be at least 8 characters";
+            return;
+        }
+
+        var result = await IdentityService.ResetPasswordAsync(_resetPasswordUser.Id, _newPassword, CancellationToken.None);
+        
+        if (result.Succeeded)
+        {
+            _showResetPasswordDialog = false;
+        }
+        else
+        {
+            _passwordError = string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    void DeleteUser(ApplicationUser user)
+    {
+        _deleteUser = user;
+        _showDeleteDialog = true;
+    }
+
+    async Task ConfirmDelete()
+    {
+        if (_deleteUser == null) return;
+        
+        var result = await IdentityService.DeleteUserAsync(_deleteUser.Id, CancellationToken.None);
+        
+        if (result.Succeeded)
+        {
+            await LoadData();
+            _showDeleteDialog = false;
+        }
+    }
+
+    void RowClicked(TableRowClickEventArgs<ApplicationUser> args)
+    {
+        // Handle row click
+    }
+
+    string GetInitials(string firstName, string lastName)
+    {
+        var initials = "";
+        if (!string.IsNullOrEmpty(firstName)) initials += firstName[0];
+        if (!string.IsNullOrEmpty(lastName)) initials += lastName[0];
+        return initials.ToUpper();
+    }
+
+    Color GetRoleColor(string role) => role switch
+    {
+        "SuperAdmin" => Color.Error,
+        "TenantAdmin" => Color.Warning,
+        "Operator" => Color.Primary,
+        "Developer" => Color.Info,
+        "Viewer" => Color.Default,
+        _ => Color.Default
+    };
+}

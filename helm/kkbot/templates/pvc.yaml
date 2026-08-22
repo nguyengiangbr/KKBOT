@@ -1,0 +1,53 @@
+{{- if .Values.persistence.data.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kkbot.fullname" . }}-data
+  labels:
+    {{- include "kkbot.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.data.accessMode }}
+  {{- if .Values.persistence.data.storageClass }}
+  storageClassName: {{ .Values.persistence.data.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.size }}
+{{- end }}
+---
+{{- if .Values.persistence.logs.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kkbot.fullname" . }}-logs
+  labels:
+    {{- include "kkbot.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.logs.accessMode }}
+  {{- if .Values.persistence.logs.storageClass }}
+  storageClassName: {{ .Values.persistence.logs.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.logs.size }}
+{{- end }}
+---
+{{- if .Values.persistence.plugins.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kkbot.fullname" . }}-plugins
+  labels:
+    {{- include "kkbot.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.plugins.accessMode }}
+  {{- if .Values.persistence.plugins.storageClass }}
+  storageClassName: {{ .Values.persistence.plugins.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.plugins.size }}
+{{- end }}

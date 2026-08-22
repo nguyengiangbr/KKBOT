@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.AI.Optimization</AssemblyName>
+    <RootNamespace>KKBOT.AI.Optimization</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.AI.Pipeline\KKBOT.AI.Pipeline.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML" Version="3.0.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.17.0" />
+    <PackageReference Include="Microsoft.ML.TensorFlow" Version="3.0.0" />
+    <PackageReference Include="Microsoft.ML.TensorFlow.Redist" Version="3.0.0" />
+    <PackageReference Include="NumSharp" Version="0.30.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="YamlDotNet" Version="13.7.1" />
+  </ItemGroup>
+
+</Project>

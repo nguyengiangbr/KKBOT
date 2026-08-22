@@ -1,0 +1,221 @@
+@page "/visual-scripting"
+@page "/visual-scripting/{workflowId:guid}"
+@inject IVisualScriptingEngine Engine
+@inject ILogger<VisualScripting> Logger
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0">
+    <MudAppBar Elevation="1" Color="Color.Primary" Class="mb-4">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-2">Visual Scripting</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@SaveWorkflow" StartIcon="@Icons.Material.Filled.Save" Disabled="@(Workflow == null)">
+            Save
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ExecuteWorkflow" StartIcon="@Icons.Material.Filled.PlayArrow" Disabled="@(Workflow == null || _isExecuting)">
+            @(_isExecuting ? "Running..." : "Run")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@CancelExecution" StartIcon="@Icons.Material.Filled.Stop" Disabled="@(!_isExecuting)">
+            Stop
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="@ValidateWorkflow" StartIcon="@Icons.Material.Filled.CheckCircle" Disabled="@(Workflow == null)">
+            Validate
+        </MudButton>
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Width="280" Class="mud-width-280">
+        <MudNavMenu>
+            <MudNavLink href="/visual-scripting" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Workflows</MudNavLink>
+            <MudNavLink href="/visual-scripting/new" Icon="@Icons.Material.Filled.Add">New Workflow</MudNavLink>
+        </MudNavMenu>
+        
+        <MudDivider Class="my-3" />
+        
+        <MudText Typo="Typo.subtitle2" Class="px-3 mb-2">Node Palette</MudText>
+        <MudTextField @bind-Value="_searchNodeType" Placeholder="Search nodes..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Class="px-3 mb-3" Dense="true" />
+        
+        <MudList Dense="true" Class="px-2">
+            @foreach (var group in _filteredNodeGroups)
+            {
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="@group.Key" Icon="@GetCategoryIcon(group.Key)">
+                        <MudList>
+                            @foreach (var nodeDef in group.OrderBy(d => d.Name))
+                            {
+                                <MudListItem OnClick="@(() => AddNode(nodeDef.Id))" Class="mud-py-1">
+                                    <MudIcon Icon="@nodeDef.Icon" Size="Size.Small" Class="mr-2" Style="color: @nodeDef.Color" />
+                                    @nodeDef.Name
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        </MudList>
+    </MudDrawer>
+    
+    <MudMainContent Class="pa-0">
+        <MudGrid Class="h-100">
+            <MudItem xs="12" Class="h-100 d-flex flex-column">
+                @if (Workflow == null)
+                {
+                    <MudPaper Class="ma-4 d-flex flex-column align-center justify-center h-100" Elevation="1">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="@(IconSize.Large * 3)" Color="Color.Primary" Class="mb-4" />
+                        <MudText Typo="Typo.h5" Class="mb-2">Welcome to Visual Scripting</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-4 mud-text-secondary">Create visual workflows by dragging nodes and connecting them together.</MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateNewWorkflow" StartIcon="@Icons.Material.Filled.Add" Class="mt-2">
+                            Create New Workflow
+                        </MudButton>
+                    </MudPaper>
+                }
+                else
+                {
+                    <VisualScriptingEditor 
+                        Workflow="@Workflow" 
+                        WorkflowChanged="@WorkflowChanged"
+                        ReadOnly="@_isExecuting" />
+                }
+            </MudItem>
+        </MudGrid>
+    </MudMainContent>
+</MudContainer>
+
+<MudDialog @bind-Visible="@_showSaveDialog" MaxWidth="MaxWidth.Medium">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Save Workflow</MudText>
+        <MudTextField @bind-Value="_saveName" Label="Workflow Name" Required="true" />
+        <MudTextField @bind-Value "_saveDescription" Label="Description" Multiline="true" Rows="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showSaveDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmSave">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid? WorkflowId { get; set; }
+    
+    private VisualWorkflow? _workflow;
+    private VisualWorkflow Workflow => _workflow;
+    private bool _drawerOpen = true;
+    private bool _isExecuting = false;
+    private bool _showSaveDialog = false;
+    private string _saveName = "";
+    private string _saveDescription = "";
+    private string _searchNodeType = "";
+    
+    private VisualWorkflow? _workflowInstance;
+    private VisualWorkflow WorkflowInstance => _workflowInstance;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        if (WorkflowId.HasValue)
+        {
+            // Load existing workflow
+            // In a real implementation, load from database
+        }
+        else
+        {
+            // Create new workflow
+            _workflowInstance = new VisualWorkflow
+            {
+                Name = "New Workflow",
+                Description = "A new visual workflow"
+            };
+        }
+    }
+    
+    private VisualWorkflow Workflow => _workflowInstance ?? new VisualWorkflow();
+    
+    private async Task WorkflowChanged(VisualWorkflow workflow)
+    {
+        _workflowInstance = workflow;
+        StateHasChanged();
+    }
+    
+    private IEnumerable<IGrouping<string, NodeDefinition>> _filteredNodeGroups =>
+        _nodeDefinitions
+            .Where(d => string.IsNullOrWhiteSpace(_searchNodeType) || 
+                       d.Name.Contains(_searchNodeType, StringComparison.OrdinalIgnoreCase) ||
+                       d.Category.Contains(_searchNodeType, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(d => d.Category)
+            .OrderBy(g => g.Key);
+    
+    private readonly List<NodeDefinition> _nodeDefinitions = new()
+    {
+        new NodeDefinition { Id = "start", Name = "Start", Category = "Control Flow", Icon = "play_arrow", Color = "#4CAF50" },
+        new NodeDefinition { Id = "end", Name = "End", Category = "Control Flow", Icon = "stop", Color = "#F44336" },
+        new NodeDefinition { Id = "condition", Name = "Condition", Category = "Control Flow", Icon = "rule", Color = "#FF9800" },
+        new NodeDefinition { Id = "parallel", Name = "Parallel", Category = "Control Flow", Icon = "call_split", Color = "#9C27B0" },
+        new NodeDefinition { Id = "delay", Name = "Delay", Category = "Control Flow", Icon = "timer", Color = "#607D8B" },
+        new NodeDefinition { Id = "setVariable", Name = "Set Variable", Category = "Variables", Icon = "assignment", Color = "#2196F3" },
+        new NodeDefinition { Id = "getVariable", Name = "Get Variable", Category = "Variables", Icon = "visibility", Color = "#03A9F4" },
+        new NodeDefinition { Id = "log", Name = "Log", Category = "Utilities", Icon = "article", Color = "#795548" },
+        new NodeDefinition { Id = "httpRequest", Name = "HTTP Request", Category = "Integration", Icon = "cloud", Color = "#00BCD4" },
+        new NodeDefinition { Id = "pluginAction", Name = "Plugin Action", Category = "Game", Icon = "extension", Color = "#E91E63" },
+        new NodeDefinition { Id = "aiInference", Name = "AI Inference", Category = "AI", Icon = "psychology", Color = "#673AB7" },
+        new NodeDefinition { Id = "deviceCapture", Name = "Device Capture", Category = "Device", Icon = "camera_alt", Color = "#009688" },
+        new NodeDefinition { Id = "deviceInput", Name = "Device Input", Category = "Device", Icon = "touch_app", Color = "#009688" },
+        new NodeDefinition { Id = "perception", Name = "Perception", Category = "AI", Icon = "visibility", Color = "#673AB7" },
+        new NodeDefinition { Id = "transform", Name = "Transform", Category = "Data", Icon = "transform", Color = "#FF9800" },
+        new NodeDefinition { Id = "filter", Name = "Filter", Category = "Data", Icon = "filter_list", Color = "#FF9800" },
+        new NodeDefinition { Id = "loop", Name = "Loop", Category = "Control Flow", Icon = "loop", Color = "#9C27B0" },
+        new NodeDefinition { Id = "branch", Name = "Branch", Category = "Control Flow", Icon = "call_split", Color = "#9C27B0" }
+    };
+    
+    private string GetCategoryIcon(string category) => category switch
+    {
+        "Control Flow" => Icons.Material.Filled.CallSplit,
+        "Variables" => Icons.Material.Filled.DataObject,
+        "Utilities" => Icons.Material.Filled.Build,
+        "Integration" => Icons.Material.Filled.Cloud,
+        "Game" => Icons.Material.Filled.SportsEsports,
+        "AI" => Icons.Material.Filled.Psychology,
+        "Device" => Icons.Material.Filled.PhoneAndroid,
+        "Data" => Icons.Material.Filled.Transform,
+        _ => Icons.Material.Filled.Category
+    };
+    
+    private void CreateNewWorkflow()
+    {
+        _workflowInstance = new VisualWorkflow
+        {
+            Name = "New Workflow",
+            Description = "A new visual workflow"
+        };
+        NavigationManager.NavigateTo("/visual-scripting");
+    }
+    
+    private async Task AddNode(string nodeTypeId)
+    {
+        // The VisualScriptingEditor component handles this
+    }
+    
+    private async Task ExecuteWorkflow()
+    {
+        // Handled by VisualScriptingEditor component
+    }
+    
+    private async Task CancelExecution() { }
+    private async Task ValidateWorkflow() { }
+    private async Task SaveWorkflow()
+    {
+        _showSaveDialog = true;
+    }
+    
+    private async Task ConfirmSave()
+    {
+        if (Workflow != null)
+        {
+            Workflow.Name = _saveName;
+            Workflow.Description = _saveDescription;
+            // Save to database
+            _showSaveDialog = false;
+            Snackbar.Add("Workflow saved!", Severity.Success);
+        }
+    }
+    
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+}

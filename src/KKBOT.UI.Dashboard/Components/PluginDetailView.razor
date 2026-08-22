@@ -1,0 +1,130 @@
+@* Plugin Detail View Component *@
+<div class="plugin-detail">
+    <div class="detail-header d-flex align-center mb-4">
+        @if (!string.IsNullOrEmpty(Plugin.IconUrl))
+        {
+            <img src="@Plugin.IconUrl" alt="@Plugin.Name" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;" />
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Extension" Size="@(IconSize.Large * 2)" Class="mud-primary-text" Style="width: 80px; height: 80px;" />
+        }
+        <div class="ml-4 flex-grow-1">
+            <div class="d-flex align-center mb-2">
+                <MudText Typo="Typo.h5" Class="mb-0 me-3">@Plugin.Name</MudText>
+                <MudChip Color="Color.Primary" Size="Size.Small">v@Plugin.Version</MudChip>
+                @if (Plugin.Verified)
+                {
+                    <MudChip Color="Color.Success" Size="Size.Small" Class="ml-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Small" Class="mr-1" /> Verified
+                    </MudChip>
+                }
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">by @Plugin.Author</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">Published @Plugin.PublishedAt.ToString("MMM dd, yyyy")</MudText>
+        </div>
+    </div>
+
+    <MudDivider Class="my-4" />
+
+    <MudText Typo="Typo.h6" Class="mb-3">Description</MudText>
+    <MudText Typo="Typo.body1">@Plugin.Description</MudText>
+
+    <MudDivider Class="my-4" />
+
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudText Typo="Typo.subtitle2" Class="mb-3">Statistics</MudText>
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.h6" Class="mb-0">@Plugin.DownloadCount.ToString("N0")</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Downloads</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.h6" Class="mb-0">@Plugin.Rating.ToString("0.0")</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Rating (@Plugin.RatingCount reviews)</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-3" Elevation="1">
+                <MudText Typo="Typo.subtitle2" Class="mb-3">Links</MudText>
+                @if (!string.IsNullOrEmpty(Plugin.RepositoryUrl))
+                {
+                    <MudLink Href="@Plugin.RepositoryUrl" Target="_blank" Class="d-block mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" Class="mr-2" /> Repository
+                    </MudLink>
+                }
+                @if (!string.IsNullOrEmpty(Plugin.DownloadUrl))
+                {
+                    <MudLink Href="@Plugin.DownloadUrl" Target="_blank" Class="d-block">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudDownload" Size="Size.Small" Class="mr-2" /> Direct Download
+                    </MudLink>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (Plugin.Manifest.Dependencies.Length > 0)
+    {
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.h6" Class="mb-3">Dependencies</MudText>
+        <MudTable Items="@Plugin.Manifest.Dependencies" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Plugin</MudTh>
+                <MudTh>Version Range</MudTh>
+                <MudTh>Optional</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.PluginId</MudTd>
+                <MudTd><MudChip Size="Size.Small">@context.VersionRange</MudChip></MudTd>
+                <MudTd>@(context.IsOptional ? "Yes" : "No")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+    @if (Plugin.Manifest.SupportedResolutions.Length > 0)
+    {
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.h6" Class="mb-3">Supported Resolutions</MudText>
+        <MudGrid>
+            @foreach (var res in Plugin.Manifest.SupportedResolutions)
+            {
+                <MudItem xs="6" md="3">
+                    <MudChip Color="Color.Primary" Variant="Variant.Filled" Class="w-100 d-flex justify-center">@res.Width x @res.Height</MudChip>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    @if (Plugin.Manifest.RequiredPermissions.Length > 0)
+    {
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.h6" Class="mb-3">Required Permissions</MudText>
+        <MudGrid>
+            @foreach (var perm in Plugin.Manifest.RequiredPermissions)
+            {
+                <MudItem xs="6" md="4">
+                    <MudChip Color="Color.Warning" Size="Size.Small">@perm</MudChip>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    <MudDivider Class="my-4" />
+    <div class="d-flex justify-end">
+        <MudButton Variant="Variant.Outlined" OnClick="@OnClose">Close</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => OnInstall?.Invoke(Plugin))" Class="ml-2" Disabled="@IsInstalled">
+            @(IsInstalled ? "Already Installed" : "Install")
+        </MudButton>
+    </div>
+</div>
+
+@code {
+    [Parameter] public PluginRegistryEntry Plugin { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<PluginRegistryEntry> OnInstall { get; set; }
+    [Parameter] public bool IsInstalled { get; set; } = false;
+}

@@ -1,0 +1,950 @@
+@page "/ai/models"
+@inject IModelRegistry ModelRegistry
+@inject ITrainingOrchestrator TrainingOrchestrator
+@inject IInferenceEngine InferenceEngine
+@inject IModelDeploymentService DeploymentService
+@inject ILogger<AIModels> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">AI Model Management</MudText>
+
+    <MudTabs>
+        <MudTabPanel Text="Models">
+            <ModelListView />
+        </MudTabPanel>
+        <MudTabPanel Text="Training Jobs">
+            <TrainingJobsView />
+        </MudTabPanel>
+        <MudTabPanel Text="Deployments">
+            <DeploymentsView />
+        </MudTabPanel>
+        <MudTabPanel Text="Inference">
+            <InferenceView />
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@* ===== Model List Component ===== *@
+<MudComponentClass="ModelListView">
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_searchString" Placeholder="Search models..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" Label="Search" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_typeFilter" Label="Type" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var type in Enum.GetValues<ModelType>())
+                    {
+                        <MudSelectItem Value="@type">@type</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_statusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var status in Enum.GetValues<ModelStatus>())
+                    {
+                        <MudSelectItem Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog" StartIcon="@Icons.Material.Filled.Add" Class="mt-6 w-100">Register Model</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        @if (_isLoadingModels)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredModels" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Version</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Framework</MudTh>
+                    <MudTh>Accuracy</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Updated</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Psychology" Color="Color.Primary" Class="me-2" />
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@context.Name</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.ModelId</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd>v@context.Version</MudTd>
+                    <MudTd><MudChip Size="Size.Small" Color="Color.Primary">@context.Type</MudChip></MudTd>
+                    <MudTd><MudChip Size="Size.Small" Color="Color.Secondary">@context.Framework</MudChip></MudTd>
+                    <MudTd>@(context.Metrics.Accuracy > 0 ? context.Metrics.Accuracy.ToString("P2") : "N/A")</MudTd>
+                    <MudTd><MudChip Color="@GetStatusColor(context.Metrics.Accuracy > 0 ? ModelStatus.Ready : ModelStatus.Draft)" Size="Size.Small">@(context.Metrics.Accuracy > 0 ? "Ready" : "Draft")</MudChip></MudTd>
+                    <MudTd>@context.UpdatedAt.ToString("g")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" @onclick="@(() => ViewModel(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success" @onclick="@(() => StartTraining(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Small" Color="Color.Info" @onclick="@(() => DeployModel(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" @onclick="@(() => DeleteModel(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudComponentClass>
+
+@* ===== Training Jobs Component ===== *@
+<MudComponentClass="TrainingJobsView">
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_trainingStatusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var status in Enum.GetValues<TrainingStatus>())
+                    {
+                        <MudSelectItem Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenTrainingDialog" StartIcon="@Icons.Material.Filled.PlayCircle" Class="mt-6 w-100">Start Training</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        @if (_isLoadingTraining)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredTrainingJobs" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Model</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Progress</MudTh>
+                    <MudTh>Current Epoch</MudTh>
+                    <MudTh>Loss</MudTh>
+                    <MudTh>Accuracy</MudTh>
+                    <MudTh>Started</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.ModelId</MudTd>
+                    <MudTd><MudChip Color="@GetTrainingStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip></MudTd>
+                    <MudTd>
+                        <MudProgressLinear Value="@(context.Config.Epochs > 0 ? (double)context.Progress.CurrentEpoch / context.Config.Epochs * 100 : 0)" Color="@GetProgressColor(context.Status)" Class="w-100" />
+                    </MudTd>
+                    <MudTd>@context.Progress.CurrentEpoch / @context.Config.Epochs</MudTd>
+                    <MudTd>@context.Progress.CurrentLoss.ToString("F4")</MudTd>
+                    <MudTd>@(context.Progress.CurrentMetrics.GetValueOrDefault("accuracy", 0).ToString("P2"))</MudTd>
+                    <MudTd>@context.StartedAt.ToString("g")</MudTd>
+                    <MudTd>
+                        @if (context.Status == TrainingStatus.Running || context.Status == TrainingStatus.Paused)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Pause" Size="Size.Small" Color="Color.Warning" @onclick="@(() => PauseTraining(context))" Disabled="@(context.Status != TrainingStatus.Running)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success" @onclick="@(() => ResumeTraining(context))" Disabled="@(context.Status != TrainingStatus.Paused)" />
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Color="Color.Error" @onclick="@(() => CancelTraining(context))" Disabled="@(context.Status != TrainingStatus.Running && context.Status != TrainingStatus.Paused && context.Status != TrainingStatus.Queued)" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudComponentClass>
+
+@* ===== Deployments Component ===== *@
+<MudComponentClass="DeploymentsView">
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_deploymentStatusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var status in Enum.GetValues<DeploymentStatus>())
+                    {
+                        <MudSelectItem Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenDeployDialog" StartIcon="@Icons.Material.Filled.CloudUpload" Class="mt-6 w-100">Deploy Model</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        @if (_isLoadingDeployments)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredDeployments" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Model</MudTh>
+                    <MudTh>Version</MudTh>
+                    <MudTh>Target</MudTh>
+                    <MudTh>Replicas</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Endpoint</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.ModelId</MudTd>
+                    <MudTd>v@context.ModelVersion</MudTd>
+                    <MudTd><MudChip Size="Size.Small">@context.Target</MudChip></MudTd>
+                    <MudTd>@context.Replicas</MudTd>
+                    <MudTd><MudChip Color="@GetDeploymentStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip></MudTd>
+                    <MudTd><MudText Typo="Typo.caption">@context.EndpointUrl</MudText></MudTd>
+                    <MudTd>@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" @onclick="@(() => ViewDeploymentMetrics(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Preview" Size="Size.Small" Color="Color.Info" @onclick="@(() => TestDeployment(context))" />
+                        @if (context.Status == DeploymentStatus.Running)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" @onclick="@(() => DeleteDeployment(context))" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudComponentClass>
+
+@* ===== Inference Component ===== *@
+<MudComponentClass="InferenceView">
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">Run Inference</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value "_inferenceModelId" Label="Model" Required="true" Variant="Variant.Outlined">
+                    @foreach (var model in _availableModels)
+                    {
+                        <MudSelectItem Value="@model.ModelId">@model.Name v@model.Version</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value "_inferenceModelVersion" Label="Version" Required="true" Variant="Variant.Outlined">
+                    @foreach (var version in _availableVersions)
+                    {
+                        <MudSelectItem Value="@version">@version</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <MudTextField @bind-Value "_inferenceInput" Label="Input (JSON)" Multiline="true" Rows="6" Class="mt-3" FullWidth="true" Placeholder='{ "input": "sample text for classification" }' />
+
+        <MudGrid Class="mt-3">
+            <MudItem xs="12" md="3">
+                <MudNumericField @bind-Value "_inferenceTopK" Label="Top K" Min="1" Max="20" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudNumericField @bind-Value "_inferenceTemperature" Label="Temperature" Min="0" Max="2" Step="0.1" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudNumericField @bind-Value "_inferenceMaxTokens" Label="Max Tokens" Min="1" Max="4096" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@RunInference" Class="mt-6 w-100" Disabled="@_isRunningInference">
+                    @if (_isRunningInference)
+                    {
+                        <MudProgressCircular Size="Size.Small" Class="me-2" />
+                    }
+                    @(_isRunningInference ? "Running..." : "Run Inference")
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (_inferenceResult != null)
+    {
+        <MudPaper Class="pa-4 mt-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Inference Result</MudText>
+            
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1" Variant="Variant.Outlined">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Metrics</MudText>
+                        <MudGrid>
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.h6" Class="mb-0">@_inferenceResult.Metrics.LatencyMs.ToString("F1")</MudText>
+                                <MudText Typo="Typo.caption">Latency (ms)</MudText>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.h6" Class="mb-0">@_inferenceResult.Metrics.InferenceTimeMs.ToString("F1")</MudText>
+                                <MudText Typo="Typo.caption">Inference Time (ms)</MudText>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.h6" Class="mb-0">@_inferenceResult.Metrics.PreprocessTimeMs.ToString("F1")</MudText>
+                                <MudText Typo="Typo.caption">Preprocess (ms)</MudText>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.h6" Class="mb-0">@_inferenceResult.Metrics.PostprocessTimeMs.ToString("F1")</MudText>
+                                <MudText Typo="Typo.caption">Postprocess (ms)</MudText>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1" Variant="Variant.Outlined">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Output</MudText>
+                        <MudText Typo="Typo.body2">@_inferenceResult.Metrics.OutputTokens tokens generated</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.h6" Class="mt-4 mb-2">Raw Output</MudText>
+            <MudPaper Class="pa-3" Elevation="1" Variant="Variant.Outlined" Style="max-height: 300px; overflow: auto;">
+                <pre><code>@JsonSerializer.Serialize(_inferenceResult.Outputs, new JsonSerializerOptions { WriteIndented = true })</code></pre>
+            </MudPaper>
+        }
+    </MudPaper>
+</MudComponentClass>
+
+@* ===== Dialogs ===== *@
+<MudDialog @bind-Visible="@_showCreateModelDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Register New Model</MudText>
+        <MudTextField @bind-Value "_newModelId" Label="Model ID" Required="true" HelperText="Unique identifier (e.g., sentiment-classifier)" />
+        <MudTextField @bind-Value "_newModelName" Label="Name" Required="true" />
+        <MudTextField @bind-Value "_newModelVersion" Label="Version" Required="true" HelperText="Semantic version (e.g., 1.0.0)" />
+        <MudSelect @bind-Value "_newModelType" Label="Type" Required="true">
+            @foreach (var type in Enum.GetValues<ModelType>())
+            {
+                <MudSelectItem Value="@type">@type</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect @bind-Value "_newModelFramework" Label="Framework" Required="true">
+            @foreach (var fw in Enum.GetValues<ModelFramework>())
+            {
+                <MudSelectItem Value="@fw">@fw</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value "_newModelDescription" Label="Description" Multiline="true" Rows="3" />
+        <MudTextField @bind-Value "_newModelAuthor" Label="Author" Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCreateModelDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateModel">Register</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="@_showTrainingDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Start Training Job</MudText>
+        <MudSelect @bind-Value "_trainingModelId" Label="Model" Required="true">
+            @foreach (var model in _availableModels)
+            {
+                <MudSelectItem Value="@model.ModelId">@model.Name v@model.Version</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value "_trainingJobName" Label="Job Name" Required="true" />
+        <MudTextField @bind-Value "_trainingDatasetPath" Label="Dataset Path" Required="true" />
+        <MudTextField @bind-Value "_trainingValDatasetPath" Label="Validation Dataset Path" />
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value "_trainingEpochs" Label="Epochs" Min="1" Max="1000" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value "_trainingBatchSize" Label="Batch Size" Min="1" Max="512" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value "_trainingLearningRate" Label="Learning Rate" Min="0.00001" Max="1" Step="0.0001" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value "_trainingOptimizer" Label="Optimizer" Required="true">
+                    <MudSelectItem Value="adam">Adam</MudSelectItem>
+                    <MudSelectItem Value="sgd">SGD</MudSelectItem>
+                    <MudSelectItem Value="rmsprop">RMSprop</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value "_trainingLossFunction" Label="Loss Function" Required="true">
+                    <MudSelectItem Value="cross_entropy">Cross Entropy</MudSelectItem>
+                    <MudSelectItem Value="mse">MSE</MudSelectItem>
+                    <MudSelectItem Value="mae">MAE</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showTrainingDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartTrainingJob">Start Training</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="@_showDeployDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Deploy Model</MudText>
+        <MudSelect @bind-Value "_deployModelId" Label="Model" Required="true">
+            @foreach (var model in _availableModels)
+            {
+                <MudSelectItem Value="@model.ModelId">@model.Name v@model.Version</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect @bind-Value "_deployModelVersion" Label="Version" Required="true">
+            @foreach (var version in _deployAvailableVersions)
+            {
+                <MudSelectItem Value="@version">@version</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value "_deployName" Label="Deployment Name" Required="true" />
+        <MudSelect @bind-Value "_deployTarget" Label="Target" Required="true">
+            @foreach (var target in Enum.GetValues<DeploymentTarget>())
+            {
+                <MudSelectItem Value="@target">@target</MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField @bind-Value "_deployReplicas" Label="Replicas" Min="1" Max="10" Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDeployDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="DeployModelConfirm">Deploy</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Deployment Metrics Dialog *@
+<MudDialog @bind-Visible="@_showMetricsDialog" MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Deployment Metrics: @(_selectedDeployment?.Name ?? "")</MudText>
+        @if (_deploymentMetrics != null)
+        {
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_deploymentMetrics.CurrentReplicas / @_deploymentMetrics.DesiredReplicas</MudText>
+                        <MudText Typo="Typo.caption">Replicas</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_deploymentMetrics.CpuUtilization.ToString("F1")%</MudText>
+                        <MudText Typo="Typo.caption">CPU Usage</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_deploymentMetrics.MemoryUtilization.ToString("F1")%</MudText>
+                        <MudText Typo="Typo.caption">Memory Usage</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_deploymentMetrics.RequestsPerSecond.ToString("F1")</MudText>
+                        <MudText Typo="Typo.caption">Req/sec</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_deploymentMetrics.AvgLatencyMs.ToString("F1")ms</MudText>
+                        <MudText Typo="Typo.caption">Avg Latency</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@(_deploymentMetrics.ErrorRate * 100).ToString("F2")%</MudText>
+                        <MudText Typo="Typo.caption">Error Rate</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-0">@_deploymentMetrics.TotalRequests.ToString("N0")</MudText>
+                        <MudText Typo="Typo.caption">Total Requests</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showMetricsDialog = false">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Models
+    List<ModelMetadata> _models = new();
+    List<ModelMetadata> _filteredModels = new();
+    List<ModelMetadata> _availableModels = new();
+    List<string> _availableVersions = new();
+    List<string> _deployAvailableVersions = new();
+    bool _isLoadingModels = true;
+    string _searchString = "";
+    ModelType? _typeFilter;
+    ModelStatus? _statusFilter;
+
+    // Training
+    List<TrainingJob> _trainingJobs = new();
+    List<TrainingJob> _filteredTrainingJobs = new();
+    bool _isLoadingTraining = true;
+    TrainingStatus? _trainingStatusFilter;
+
+    // Deployments
+    List<ModelDeployment> _deployments = new();
+    List<ModelDeployment> _filteredDeployments = new();
+    bool _isLoadingDeployments = true;
+    DeploymentStatus? _deploymentStatusFilter;
+
+    // Inference
+    string _inferenceModelId = "";
+    string _inferenceModelVersion = "";
+    string _inferenceInput = "";
+    int _inferenceTopK = 5;
+    double _inferenceTemperature = 1.0;
+    int _inferenceMaxTokens = 100;
+    bool _isRunningInference = false;
+    InferenceResponse? _inferenceResult;
+    List<ModelMetadata> _inferenceModels = new();
+    List<string> _availableInferenceVersions = new();
+
+    // Deployments
+    List<ModelDeployment> _allDeployments = new();
+    List<string> _deployAvailableVersions = new();
+    DeploymentMetrics? _deploymentMetrics;
+    ModelDeployment? _selectedDeployment;
+
+    // Dialogs
+    bool _showCreateModelDialog = false;
+    string _newModelId = "";
+    string _newModelName = "";
+    string _newModelVersion = "1.0.0";
+    ModelType _newModelType = ModelType.Classification;
+    ModelFramework _newModelFramework = ModelFramework.ONNX;
+    string _newModelDescription = "";
+    string _newModelAuthor = "";
+
+    bool _showTrainingDialog = false;
+    string _trainingModelId = "";
+    string _trainingJobName = "";
+    string _trainingDatasetPath = "";
+    string _trainingValDatasetPath = "";
+    int _trainingEpochs = 10;
+    int _trainingBatchSize = 32;
+    double _trainingLearningRate = 0.001;
+    string _trainingOptimizer = "adam";
+    string _trainingLossFunction = "cross_entropy";
+
+    bool _showDeployDialog = false;
+    string _deployModelId = "";
+    string _deployModelVersion = "";
+    string _deployName = "";
+    DeploymentTarget _deployTarget = DeploymentTarget.Local;
+    int _deployReplicas = 1;
+
+    bool _showMetricsDialog = false;
+    ModelDeployment? _selectedDeployment;
+    DeploymentMetrics? _deploymentMetrics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadModels();
+        await LoadTrainingJobs();
+        await LoadDeployments();
+    }
+
+    async Task LoadModels()
+    {
+        _isLoadingModels = true;
+        try
+        {
+            _models = (await ModelRegistry.ListModelsAsync(new ModelListQuery(), CancellationToken.None)).ToList();
+            _availableModels = _models.ToList();
+            _filteredModels = _models.ToList();
+            UpdateAvailableVersions();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load models");
+        }
+        finally
+        {
+            _isLoadingModels = false;
+        }
+    }
+
+    void UpdateAvailableVersions()
+    {
+        var selected = _models.FirstOrDefault(m => m.ModelId == _inferenceModelId) 
+            ?? _models.FirstOrDefault(m => m.ModelId == _trainingModelId)
+            ?? _models.FirstOrDefault(m => m.ModelId == _deployModelId);
+        
+        if (selected != null)
+        {
+            var versions = _models
+                .Where(m => m.ModelId == selected.ModelId)
+                .Select(m => m.Version)
+                .OrderByDescending(v => v)
+                .ToList();
+            
+            if (_inferenceModelId == selected.ModelId)
+                _availableVersions = versions;
+            if (_trainingModelId == selected.ModelId)
+                _availableVersions = versions;
+            if (_deployModelId == selected.ModelId)
+                _deployAvailableVersions = versions;
+        }
+    }
+
+    void ApplyModelFilters()
+    {
+        var query = _models.AsQueryable();
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+            query = query.Where(m => m.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) || m.ModelId.Contains(_searchString));
+        
+        if (_typeFilter.HasValue)
+            query = query.Where(m => m.Type == _typeFilter.Value);
+        
+        // Approximate status from metrics
+        if (_statusFilter.HasValue)
+        {
+            if (_statusFilter == ModelStatus.Ready || _statusFilter == ModelStatus.Deployed)
+                query = query.Where(m => m.Metrics.Accuracy > 0);
+            else if (_statusFilter == ModelStatus.Draft)
+                query = query.Where(m => m.Metrics.Accuracy == 0);
+        }
+
+        _filteredModels = query.ToList();
+    }
+
+    async Task LoadTrainingJobs()
+    {
+        _isLoadingTraining = true;
+        try
+        {
+            _trainingJobs = (await TrainingOrchestrator.ListTrainingJobsAsync(new TrainingJobQuery(), CancellationToken.None)).ToList();
+            _filteredTrainingJobs = _trainingJobs.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load training jobs");
+        }
+        finally
+        {
+            _isLoadingTraining = false;
+        }
+    }
+
+    void ApplyTrainingFilters()
+    {
+        var query = _trainingJobs.AsQueryable();
+        
+        if (_trainingStatusFilter.HasValue)
+            query = query.Where(j => j.Status == _trainingStatusFilter.Value);
+
+        _filteredTrainingJobs = query.OrderByDescending(j => j.StartedAt).ToList();
+    }
+
+    async Task LoadDeployments()
+    {
+        _isLoadingDeployments = true;
+        try
+        {
+            _deployments = (await DeploymentService.ListDeploymentsAsync(new DeploymentQuery(), CancellationToken.None)).ToList();
+            _allDeployments = _deployments.ToList();
+            _filteredDeployments = _deployments.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load deployments");
+        }
+        finally
+        {
+            _isLoadingDeployments = false;
+        }
+    }
+
+    void ApplyDeploymentFilters()
+    {
+        var query = _deployments.AsQueryable();
+        
+        if (_deploymentStatusFilter.HasValue)
+            query = query.Where(d => d.Status == _deploymentStatusFilter.Value);
+
+        _filteredDeployments = query.OrderByDescending(d => d.CreatedAt).ToList();
+    }
+
+    // Model CRUD
+    async Task CreateModel()
+    {
+        var model = new ModelMetadata(
+            _newModelId, _newModelName, _newModelVersion,
+            _newModelType, _newModelFramework,
+            _newModelDescription, _newModelAuthor,
+            new Dictionary<string, string>(),
+            new ModelMetrics(0, 0, 0, 0, 0, new(), DateTime.UtcNow, ""),
+            new ModelSchema("input", "float32", new[] { -1, 768 }),
+            new ModelSchema("output", "float32", new[] { -1, 10 }),
+            new Dictionary<string, object>(),
+            DateTime.UtcNow, DateTime.UtcNow
+        );
+
+        try
+        {
+            await ModelRegistry.RegisterModelAsync(model, CancellationToken.None);
+            await LoadModels();
+            _showCreateModelDialog = false;
+            
+            // Reset form
+            _newModelId = "";
+            _newModelName = "";
+            _newModelVersion = "1.0.0";
+            _newModelDescription = "";
+            _newModelAuthor = "";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create model");
+        }
+    }
+
+    async Task ViewModel(ModelMetadata model)
+    {
+        // Navigate to detail or show dialog
+    }
+
+    async Task StartTraining(ModelMetadata model)
+    {
+        _trainingModelId = model.ModelId;
+        _trainingJobName = $"{model.Name}-training-{DateTime.Now:yyyyMMdd-HHmmss}";
+        _trainingDatasetPath = "";
+        _trainingValDatasetPath = "";
+        _trainingEpochs = 10;
+        _trainingBatchSize = 32;
+        _trainingLearningRate = 0.001;
+        _trainingOptimizer = "adam";
+        _trainingLossFunction = "cross_entropy";
+        _showTrainingDialog = true;
+    }
+
+    async Task StartTrainingJob()
+    {
+        var request = new StartTrainingRequest(
+            _trainingModelId,
+            _trainingJobName,
+            new TrainingConfig(
+                _trainingDatasetPath,
+                _trainingValDatasetPath,
+                _trainingEpochs,
+                _trainingBatchSize,
+                _trainingLearningRate,
+                _trainingOptimizer,
+                _trainingLossFunction,
+                new Dictionary<string, object>(),
+                true,
+                3,
+                null,
+                new[] { "accuracy", "loss", "f1" }
+            )
+        );
+
+        try
+        {
+            await TrainingOrchestrator.StartTrainingAsync(request, CancellationToken.None);
+            await LoadTrainingJobs();
+            _showTrainingDialog = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start training");
+        }
+    }
+
+    async Task PauseTraining(TrainingJob job)
+    {
+        await TrainingOrchestrator.PauseTrainingAsync(job.JobId, CancellationToken.None);
+        await LoadTrainingJobs();
+    }
+
+    async Task ResumeTraining(TrainingJob job)
+    {
+        await TrainingOrchestrator.ResumeTrainingAsync(job.JobId, CancellationToken.None);
+        await LoadTrainingJobs();
+    }
+
+    async Task CancelTraining(TrainingJob job)
+    {
+        await TrainingOrchestrator.CancelTrainingAsync(job.JobId, CancellationToken.None);
+        await LoadTrainingJobs();
+    }
+
+    async Task DeployModel(ModelMetadata model)
+    {
+        _deployModelId = model.ModelId;
+        _deployName = $"{model.Name}-deploy-{DateTime.Now:yyyyMMdd-HHmmss}";
+        _deployModelVersion = model.Version;
+        _deployTarget = DeploymentTarget.Local;
+        _deployReplicas = 1;
+        _showDeployDialog = true;
+    }
+
+    async Task DeployModelConfirm()
+    {
+        var request = new DeployModelRequest(
+            _deployModelId,
+            _deployModelVersion,
+            _deployName,
+            _deployTarget,
+            new DeploymentConfig
+            {
+                MinReplicas = 1,
+                MaxReplicas = _deployReplicas,
+                TargetCpuUtilization = 70,
+                TargetMemoryUtilization = 80,
+                RequestTimeoutSeconds = 30,
+                EnableGpu = false
+            }
+        );
+
+        try
+        {
+            await DeploymentService.DeployAsync(request, CancellationToken.None);
+            await LoadDeployments();
+            _showDeployDialog = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to deploy model");
+        }
+    }
+
+    async Task ViewDeploymentMetrics(ModelDeployment deployment)
+    {
+        _selectedDeployment = deployment;
+        _deploymentMetrics = await DeploymentService.GetDeploymentMetricsAsync(deployment.DeploymentId, CancellationToken.None);
+        _showMetricsDialog = true;
+    }
+
+    async Task TestDeployment(ModelDeployment deployment)
+    {
+        // Navigate to inference tab with this model selected
+        _inferenceModelId = deployment.ModelId;
+        _inferenceModelVersion = deployment.ModelVersion;
+        UpdateAvailableVersions();
+    }
+
+    async Task DeleteDeployment(ModelDeployment deployment)
+    {
+        await DeploymentService.DeleteDeploymentAsync(deployment.DeploymentId, CancellationToken.None);
+        await LoadDeployments();
+    }
+
+    async Task RunInference()
+    {
+        if (string.IsNullOrWhiteSpace(_inferenceModelId) || string.IsNullOrWhiteSpace(_inferenceInput))
+            return;
+
+        _isRunningInference = true;
+        _inferenceResult = null;
+
+        try
+        {
+            var request = new InferenceRequest
+            {
+                RequestId = Guid.NewGuid().ToString(),
+                ModelId = _inferenceModelId,
+                ModelVersion = _inferenceModelVersion,
+                Inputs = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(_inferenceInput) 
+                    ?? new Dictionary<string, object>(),
+                Options = new InferenceOptions
+                {
+                    TopK = _inferenceTopK,
+                    Temperature = _inferenceTemperature,
+                    MaxTokens = _inferenceMaxTokens
+                }
+            };
+
+            _inferenceResult = await InferenceEngine.PredictAsync(request, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Inference failed");
+        }
+        finally
+        {
+            _isRunningInference = false;
+        }
+    }
+
+    void UpdateAvailableVersions()
+    {
+        var selected = _models.FirstOrDefault(m => m.ModelId == _inferenceModelId);
+        if (selected != null)
+        {
+            _availableVersions = _models
+                .Where(m => m.ModelId == selected.ModelId)
+                .Select(m => m.Version)
+                .OrderByDescending(v => v)
+                .ToList();
+            
+            if (!_availableVersions.Contains(_inferenceModelVersion))
+                _inferenceModelVersion = _availableVersions.FirstOrDefault() ?? "";
+        }
+    }
+
+    Color GetStatusColor(ModelStatus status) => status switch
+    {
+        ModelStatus.Ready => Color.Success,
+        ModelStatus.Deployed => Color.Primary,
+        ModelStatus.Training => Color.Warning,
+        ModelStatus.Validating => Color.Info,
+        ModelStatus.Failed => Color.Error,
+        ModelStatus.Archived => Color.Default,
+        _ => Color.Default
+    };
+
+    Color GetTrainingStatusColor(TrainingStatus status) => status switch
+    {
+        TrainingStatus.Running => Color.Success,
+        TrainingStatus.Completed => Color.Success,
+        TrainingStatus.Paused => Color.Warning,
+        TrainingStatus.Queued => Color.Info,
+        TrainingStatus.Failed => Color.Error,
+        TrainingStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    Color GetProgressColor(TrainingStatus status) => status switch
+    {
+        TrainingStatus.Running => Color.Primary,
+        TrainingStatus.Completed => Color.Success,
+        TrainingStatus.Paused => Color.Warning,
+        TrainingStatus.Failed => Color.Error,
+        _ => Color.Default
+    };
+
+    Color GetDeploymentStatusColor(DeploymentStatus status) => status switch
+    {
+        DeploymentStatus.Running => Color.Success,
+        DeploymentStatus.Creating => Color.Info,
+        DeploymentStatus.Updating => Color.Warning,
+        DeploymentStatus.Scaling => Color.Warning,
+        DeploymentStatus.Stopped => Color.Default,
+        DeploymentStatus.Failed => Color.Error,
+        _ => Color.Default
+    };
+}

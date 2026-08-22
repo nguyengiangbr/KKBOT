@@ -1,0 +1,96 @@
+@page "/login"
+@layout null
+@inject IdentityService IdentityService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<div class="login-page">
+    <MudPaper Class="pa-8 login-card" Elevation="3" Style="max-width: 440px; margin: 0 auto;">
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="@(IconSize.Large * 3)" Color="Color.Primary" Class="mb-3" />
+            <MudText Typo="Typo.h4" Class="mb-1">Welcome to KKBOT</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Sign in to access your dashboard</MudText>
+        </div>
+
+        <MudTextField @bind-Value="_email" Label="Email" Required="true" FullWidth="true" Class="mb-3" InputType="InputType.Email" Placeholder="you@example.com" />
+        <MudTextField @bind-Value="_password" Label="Password" Required="true" FullWidth="true" Class="mb-3" InputType="InputType.Password" Placeholder="••••••••" />
+        
+        <MudCheckBox @bind-Checked="_rememberMe" Label="Remember me" Color="Color.Primary" Class="mb-4" />
+        
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Login" Class="w-100 mb-3" FullWidth="true" Disabled="@_isLoading">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Class="me-2" />
+            }
+            @(_isLoading ? "Signing in..." : "Sign In")
+        </MudButton>
+
+        <div class="text-center">
+            <MudLink Href="/register" Class="mud-text-primary">Create an account</MudLink>
+            <MudText Typo="Typo.caption" Class="mx-2">|</MudText>
+            <MudLink Href="/forgot-password" Class="mud-text-primary">Forgot password?</MudLink>
+        </div>
+
+        @if (_errorMessage != null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4">@_errorMessage</MudAlert>
+        }
+    </MudPaper>
+
+    <div class="text-center mt-6 mud-text-secondary">
+        <MudText Typo="Typo.caption">KKBOT v1.0.0 | Game Automation Platform</MudText>
+    </div>
+</div>
+
+<style>
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, var(--mud-palette-primary-lighten) 0%, var(--mud-palette-secondary-lighten) 100%);
+    padding: 24px;
+}
+
+.login-card {
+    width: 100%;
+}
+</style>
+
+@code {
+    string _email = "";
+    string _password = "";
+    bool _rememberMe = false;
+    bool _isLoading = false;
+    string? _errorMessage;
+
+    async Task Login()
+    {
+        _errorMessage = null;
+        _isLoading = true;
+
+        try
+        {
+            var result = await IdentityService.LoginAsync(new LoginRequest(_email, _password, _rememberMe), CancellationToken.None);
+
+            if (result != null)
+            {
+                Snackbar.Add("Welcome back!", Severity.Success);
+                NavigationManager.NavigateTo("/", true);
+            }
+            else
+            {
+                _errorMessage = "Invalid email or password";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An error occurred. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

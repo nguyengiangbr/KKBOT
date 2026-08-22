@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kkbot.fullname" . }}-config
+  labels:
+    {{- include "kkbot.labels" . | nindent 4 }}
+data:
+  appsettings.json: |
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.EntityFrameworkCore": "Information"
+        }
+      },
+      "AllowedHosts": "*",
+      "ConnectionStrings": {
+        "KkbotDb": "{{ .Values.config.connectionStrings.kkbotDb }}"
+      },
+      "Security": {
+        "SecretsPath": "{{ .Values.config.security.secretsPath }}",
+        "EncryptionPassphrase": "",
+        "EncryptionSalt": ""
+      },
+      "Plugins": {
+        "Path": "{{ .Values.config.plugins.path }}"
+      },
+      "Serilog": {
+        "MinimumLevel": {
+          "Default": "Information",
+          "Override": {
+            "Microsoft": "Warning",
+            "System": "Warning"
+          }
+        },
+        "WriteTo": [
+          { "Name": "Console" },
+          {
+            "Name": "File",
+            "Args": {
+              "path": "/app/logs/kkbot-.log",
+              "rollingInterval": "Day",
+              "retainedFileCountLimit": 30
+            }
+          }
+        ],
+        "Enrich": [ "FromLogContext", "WithMachineName", "WithProcessId", "WithThreadId" ]
+      }
+    }

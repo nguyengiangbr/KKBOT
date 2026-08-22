@@ -1,0 +1,140 @@
+@page "/jobs"
+@inject IJobRepository JobRepository
+@inject IInstanceRepository InstanceRepository
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Job Management</MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudTextField @bind-Value="_searchString" Placeholder="Search jobs..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value="_statusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    <MudSelectItem Value="JobStatus.Pending">Pending</MudSelectItem>
+                    <MudSelectItem Value="JobStatus.Running">Running</MudSelectItem>
+                    <MudSelectItem Value="JobStatus.Completed">Completed</MudSelectItem>
+                    <MudSelectItem Value="JobStatus.Failed">Failed</MudSelectItem>
+                    <MudSelectItem Value="JobStatus.Cancelled">Cancelled</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_typeFilter" Label="Type" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    <MudSelectItem Value="JobType.OneShot">One Shot</MudSelectItem>
+                    <MudSelectItem Value="JobType.Repeating">Repeating</MudSelectItem>
+                    <MudSelectItem Value="JobType.Manual">Manual</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredJobs" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>ID</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Instance</MudTh>
+                    <MudTh>Payload</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Started</MudTh>
+                    <MudTh>Completed</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id.ToString()[..8]</MudTd>
+                    <MudTd>@context.Type</MudTd>
+                    <MudTd><MudChip Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip></MudTd>
+                    <MudTd>@context.InstanceId.ToString()[..8]</MudTd>
+                    <MudTd><MudText Typo="Typo.caption">@Truncate(context.Payload, 50)</MudText></MudTd>
+                    <MudTd>@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd>@(context.StartedAt?.ToString("g") ?? "-")</MudTd>
+                    <MudTd>@(context.CompletedAt?.ToString("g") ?? "-")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success" @onclick="@(() => StartJob(context))" Disabled="@(context.Status != JobStatus.Pending)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error" @onclick="@(() => CancelJob(context))" Disabled="@(context.Status != JobStatus.Running && context.Status != JobStatus.Pending)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" @onclick="@(() => DeleteJob(context))" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    List<Job> _jobs = new();
+    List<Job> _filteredJobs = new();
+    bool _isLoading = true;
+    string _searchString = "";
+    JobStatus? _statusFilter;
+    JobType? _typeFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJobs();
+    }
+
+    async Task LoadJobs()
+    {
+        _isLoading = true;
+        // Get all jobs by getting instances first then their jobs
+        var instances = await InstanceRepository.GetAllAsync(CancellationToken.None);
+        var allJobs = new List<Job>();
+        foreach (var inst in instances)
+        {
+            var jobs = await JobRepository.GetByInstanceAsync(inst.Id, CancellationToken.None);
+            allJobs.AddRange(jobs);
+        }
+        _jobs = allJobs.OrderByDescending(j => j.CreatedAt).ToList();
+        ApplyFilters();
+        _isLoading = false;
+    }
+
+    void ApplyFilters()
+    {
+        var query = _jobs.AsQueryable();
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+            query = query.Where(j => j.Id.ToString().Contains(_searchString) || j.Payload.Contains(_searchString));
+        
+        if (_statusFilter.HasValue)
+            query = query.Where(j => j.Status == _statusFilter.Value);
+        
+        if (_typeFilter.HasValue)
+            query = query.Where(j => j.Type == _typeFilter.Value);
+
+        _filteredJobs = query.ToList();
+    }
+
+    void StartJob(Job job) { /* TODO */ }
+    void CancelJob(Job job) { /* TODO */ }
+    void DeleteJob(Job job) { /* TODO */ }
+
+    string Truncate(string value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        return value.Length <= maxLength ? value : value[..maxLength] + "...";
+    }
+
+    Color GetStatusColor(JobStatus status) => status switch
+    {
+        JobStatus.Running => Color.Success,
+        JobStatus.Pending => Color.Warning,
+        JobStatus.Completed => Color.Info,
+        JobStatus.Failed => Color.Error,
+        JobStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+}

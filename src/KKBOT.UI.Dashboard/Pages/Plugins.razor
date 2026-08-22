@@ -1,0 +1,114 @@
+@page "/plugins"
+@inject PluginLoader PluginLoader
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Plugin Management</MudText>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ReloadPlugins" StartIcon="@Icons.Material.Filled.Refresh" Class="w-100">Reload Plugins</MudButton>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudTextField @bind-Value="_pluginsPath" Label="Plugins Directory" HelperText="Path to plugin DLLs" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_plugins.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No plugins loaded. Configure the plugins directory and click Reload.</MudAlert>
+        }
+        else
+        {
+            @foreach (var plugin in _plugins)
+            {
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="@($"{plugin.GetManifest().Name} v{plugin.GetManifest().Version}")" Icon="@Icons.Material.Filled.Extension">
+                        <MudExpansionPanelSummary>
+                            <MudText Typo="Typo.body2">ID: @plugin.GetManifest().Id</MudText>
+                            <MudChip Color="@(plugin.GetManifest().RequiredPermissions.Length > 0 ? Color.Primary : Color.Default)" Size="Size.Small">@plugin.GetManifest().RequiredPermissions.Length permissions</MudChip>
+                        </MudExpansionPanelSummary>
+                        <MudExpansionPanelDetails>
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Description</MudText>
+                                    <MudText>@plugin.GetManifest().Description</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Author</MudText>
+                                    <MudText>@plugin.GetManifest().Author</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Supported Resolutions</MudText>
+                                    @foreach (var res in plugin.GetManifest().SupportedResolutions)
+                                    {
+                                        <MudChip Size="Size.Small" Class="mr-1">@res.Width x @res.Height</MudChip>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Required Permissions</MudText>
+                                    @foreach (var perm in plugin.GetManifest().RequiredPermissions)
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Primary" Class="mr-1">@perm</MudChip>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.caption">Detectors</MudText>
+                                    @foreach (var detector in plugin.GetDetectors())
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Secondary" Class="mr-1 mb-1">@detector.Id - @detector.Name</MudChip>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.caption">Tasks</MudText>
+                                    @foreach (var task in plugin.GetTasks())
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Tertiary" Class="mr-1 mb-1">@task.Id - @task.Name</MudChip>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.caption">States</MudText>
+                                    @foreach (var state in plugin.GetStates())
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Info" Class="mr-1 mb-1">@state.Id - @state.Name</MudChip>
+                                    }
+                                </MudItem>
+                            </MudGrid>
+                        </MudExpansionPanelDetails>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    List<IGameModule> _plugins = new();
+    bool _isLoading = false;
+    string _pluginsPath = "plugins";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadPlugins();
+    }
+
+    async Task ReloadPlugins()
+    {
+        _isLoading = true;
+        try
+        {
+            _plugins = (await PluginLoader.LoadPluginsAsync(_pluginsPath, CancellationToken.None)).ToList();
+        }
+        catch (Exception ex)
+        {
+            // Log error
+        }
+        _isLoading = false;
+    }
+}

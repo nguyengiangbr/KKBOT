@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.AI.Pipeline</AssemblyName>
+    <RootNamespace>KKBOT.AI.Pipeline</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Ollama\KKBOT.AI.Ollama.csproj" />
+    <ProjectReference Include="..\KKBOT.Persistence.EfCore\KKBOT.Persistence.EfCore.csproj" />
+    <ProjectReference Include="..\KKBOT.Security\KKBOT.Security.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.ML" Version="3.0.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.0" />
+    <PackageReference Include="Polly" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

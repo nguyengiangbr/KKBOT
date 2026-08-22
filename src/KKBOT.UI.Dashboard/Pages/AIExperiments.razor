@@ -1,0 +1,683 @@
+@page "/ai/experiments"
+@inject IExperimentTracker ExperimentTracker
+@inject ITrainingOrchestrator TrainingOrchestrator
+@inject ILogger<AIExperiments> Logger
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" Class="mb-4">Experiment Tracking</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_searchString" Placeholder="Search experiments..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="300" Label="Search" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect @bind-Value "_statusFilter" Label="Status" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@(null)">All</MudSelectItem>
+                    @foreach (var status in Enum.GetValues<ExperimentStatus>())
+                    {
+                        <MudSelectItem Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@OpenCreateDialog" StartIcon="@Icons.Material.Filled.Science" Class="mt-6 w-100">Create Experiment</MudButton>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                @if (_selectedExperiments.Count >= 2)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="@CompareExperiments" StartIcon="@Icons.Material.Filled.CompareArrows" Class="mt-6 w-100" Disabled="@(_selectedExperiments.Count < 2)">Compare (@_selectedExperiments.Count)</MudButton>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudTable Items="@_filteredExperiments" Hover="true" Striped="true" Dense="true" MultiSelection="@_multiSelection" OnRowClick="@RowClicked">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Model</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Versions Tested</MudTh>
+                    <MudTh>Best Version</MudTh>
+                    <MudTh>Best Accuracy</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Completed</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <div class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Science" Color="Color.Primary" Class="me-2" />
+                            <div>
+                                <MudText Typo="Typo.subtitle2">@context.Name</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.ExperimentId[..8]</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd>@context.ModelId</MudTd>
+                    <MudTd><MudChip Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip></MudTd>
+                    <MudTd>@context.Config.ModelVersions.Length</MudTd>
+                    <MudTd>@(context.Results.BestModelVersion ?? "N/A")</MudTd>
+                    <MudTd>
+                        @if (context.Results.ModelMetrics.Count > 0)
+                        {
+                            @context.Results.ModelMetrics.Values.Max(m => m.Accuracy).ToString("P2")
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">N/A</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd>@(context.CompletedAt?.ToString("g") ?? "-")</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" @onclick="@(() => ViewExperiment(context))" />
+                        @if (context.Status == ExperimentStatus.Created)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Color="Color.Success" @onclick="@(() => RunExperiment(context))" />
+                        }
+                        @if (context.Status == ExperimentStatus.Running)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Color="Color.Error" @onclick="@(() => CancelExperiment(context))" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@* Create Experiment Dialog *@
+<MudDialog @bind-Visible="@_showCreateDialog" MaxWidth="MaxWidth.Large" FullWidth="true">
+    <DialogContent>
+        <MudText Typo="Typo.h6">Create Experiment</MudText>
+        <MudTextField @bind-Value "_newExperimentName" Label="Experiment Name" Required="true" HelperText="Descriptive name for this experiment" />
+        <MudTextField @bind-Value "_newExperimentDescription" Label="Description" Multiline="true" Rows="3" HelperText="What are you testing?" />
+        
+        <MudSelect @bind-Value "_newExperimentModelId" Label="Base Model" Required="true">
+            @foreach (var model in _availableModels)
+            {
+                <MudSelectItem Value="@model.ModelId">@model.Name (@model.Version)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudText Typo="Typo.h6" Class="mt-3 mb-2">Model Versions to Compare</MudText>
+        <MudText Typo="Typo.caption" Class="mb-2">Select multiple versions of the model to compare</MudText>
+        <MudSelect @bind-Value "_newExperimentVersions" Label="Versions" MultiSelection="true" Required="true">
+            @foreach (var version in _availableModelVersions)
+            {
+                <MudSelectItem Value="@version">@version</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect @bind-Value "_newExperimentDatasetVersion" Label="Dataset Version" Required="true">
+            @foreach (var version in _availableDatasetVersions)
+            {
+                <MudSelectItem Value="@version">@version</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.h6" Class="mb-2">Training Configuration</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value "_expDatasetPath" Label="Dataset Path" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value "_expValDatasetPath" Label="Validation Dataset Path" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value "_expEpochs" Label="Epochs" Min="1" Max="1000" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value "_expBatchSize" Label="Batch Size" Min="1" Max="512" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudNumericField @bind-Value "_expLearningRate" Label="Learning Rate" Min="0.00001" Max="1" Step="0.0001" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value "_expOptimizer" Label="Optimizer" Required="true">
+                    <MudSelectItem Value="adam">Adam</MudSelectItem>
+                    <MudSelectItem Value="sgd">SGD</MudSelectItem>
+                    <MudSelectItem Value="rmsprop">RMSprop</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect @bind-Value "_expLossFunction" Label="Loss Function" Required="true">
+                    <MudSelectItem Value="cross_entropy">Cross Entropy</MudSelectItem>
+                    <MudSelectItem Value="mse">MSE</MudSelectItem>
+                    <MudSelectItem Value="mae">MAE</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCreateDialog = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateExperiment">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Experiment Detail Dialog *@
+<MudDialog @bind-Visible="@_showDetailDialog" MaxWidth="MaxWidth.Large" FullWidth="true">
+    <DialogContent>
+        @if (_selectedExperiment != null)
+        {
+            <div class="experiment-detail">
+                <div class="d-flex align-center mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Science" Size="@(IconSize.Large * 2)" Color="Color.Primary" Class="me-4" />
+                    <div>
+                        <MudText Typo="Typo.h5" Class="mb-1">@_selectedExperiment.Name</MudText>
+                        <MudChip Color="@GetStatusColor(_selectedExperiment.Status)" Size="Size.Small">@_selectedExperiment.Status</MudChip>
+                    </div>
+                </div>
+
+                <MudDivider Class="my-3" />
+
+                <MudTabs>
+                    <MudTabPanel Text="Overview">
+                        <div class="pa-4">
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Class="pa-3" Elevation="1">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Basic Info</MudText>
+                                        <MudGrid>
+                                            <MudItem xs="6"><MudText Typo="Typo.caption">Experiment ID</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedExperiment.ExperimentId[..8]...</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.caption">Model</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedExperiment.ModelId</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.caption">Dataset Version</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedExperiment.Config.DatasetVersion</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.caption">Created</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.body2">@_selectedExperiment.CreatedAt.ToString("g")</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.caption">Started</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.body2">@(_selectedExperiment.StartedAt?.ToString("g") ?? "Not started")</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.caption">Completed</MudText></MudItem>
+                                            <MudItem xs="6"><MudText Typo="Typo.body2">@(_selectedExperiment.CompletedAt?.ToString("g") ?? "Not completed")</MudText></MudItem>
+                                        </MudGrid>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Class="pa-3" Elevation="1">
+                                        <MudText Typo="Typo.subtitle2" Class="mb-2">Best Result</MudText>
+                                        @if (_selectedExperiment.Results.ModelMetrics.Count > 0)
+                                        {
+                                            var best = _selectedExperiment.Results.ModelMetrics
+                                                .OrderByDescending(kvp => kvp.Value.Accuracy)
+                                                .First();
+                                            
+                                            <MudGrid>
+                                                <MudItem xs="6">
+                                                    <MudText Typo="Typo.caption">Best Version</MudText>
+                                                    <MudText Typo="Typo.h6">@best.Key</MudText>
+                                                </MudItem>
+                                                <MudItem xs="6">
+                                                    <MudText Typo="Typo.caption">Accuracy</MudText>
+                                                    <MudText Typo="Typo.h6" Class="mud-success-text">@best.Value.Accuracy.ToString("P2")</MudText>
+                                                </MudItem>
+                                                <MudItem xs="6">
+                                                    <MudText Typo="Typo.caption">F1 Score</MudText>
+                                                    <MudText Typo="Typo.h6">@best.Value.F1Score.ToString("P2")</MudText>
+                                                </MudItem>
+                                                <MudItem xs="6">
+                                                    <MudText Typo="Typo.caption">Precision</MudText>
+                                                    <MudText Typo="Typo.h6">@best.Value.Precision.ToString("P2")</MudText>
+                                                </MudItem>
+                                                <MudItem xs="6">
+                                                    <MudText Typo="Typo.caption">Recall</MudText>
+                                                    <MudText Typo="Typo.h6">@best.Value.Recall.ToString("P2")</MudText>
+                                                </MudItem>
+                                                <MudItem xs="6">
+                                                    <MudText Typo="Typo.caption">Loss</MudText>
+                                                    <MudText Typo="Typo.h6">@best.Value.Loss.ToString("F4")</MudText>
+                                                </MudItem>
+                                            </MudGrid>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.body2" Class="mud-text-secondary">No results yet</MudText>
+                                        }
+                                    </MudPaper>
+                                </MudItem>
+                            </MudGrid>
+                        </div>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Results Comparison">
+                        <div class="pa-4">
+                            @if (_selectedExperiment.Results.ModelMetrics.Count > 0)
+                            {
+                                <MudTable Items="@_selectedExperiment.Results.ModelMetrics" Hover="true" Striped="true" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Version</MudTh>
+                                        <MudTh>Accuracy</MudTh>
+                                        <MudTh>Precision</MudTh>
+                                        <MudTh>Recall</MudTh>
+                                        <MudTh>F1 Score</MudTh>
+                                        <MudTh>Loss</MudTh>
+                                        <MudTh>Evaluated</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd>
+                                            <MudChip Color="@(context.Key == _selectedExperiment.Results.BestModelVersion ? Color.Success : Color.Default)" Size="Size.Small">@context.Key</MudChip>
+                                        </MudTd>
+                                        <MudTd>@context.Value.Accuracy.ToString("P2")</MudTd>
+                                        <MudTd>@context.Value.Precision.ToString("P2")</MudTd>
+                                        <MudTd>@context.Value.Recall.ToString("P2")</MudTd>
+                                        <MudTd>@context.Value.F1Score.ToString("P2")</MudTd>
+                                        <MudTd>@context.Value.Loss.ToString("F4")</MudTd>
+                                        <MudTd>@context.Value.EvaluatedAt.ToString("g")</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info">No results available yet. Run the experiment to see results.</MudAlert>
+                            }
+                        </div>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Training Jobs">
+                        <div class="pa-4">
+                            @if (_experimentJobs.Count > 0)
+                            {
+                                <MudTable Items="@_experimentJobs" Hover="true" Striped="true" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>Job Name</MudTh>
+                                        <MudTh>Status</MudTh>
+                                        <MudTh>Progress</MudTh>
+                                        <MudTh>Loss</MudTh>
+                                        <MudTh>Accuracy</MudTh>
+                                        <MudTh>Started</MudTh>
+                                        <MudTh>Actions</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd>@context.Name</MudTd>
+                                        <MudTd><MudChip Color="@GetTrainingStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip></MudTd>
+                                        <MudTd>
+                                            <MudProgressLinear Value="@(context.Config.Epochs > 0 ? (double)context.Progress.CurrentEpoch / context.Config.Epochs * 100 : 0)" Color="@GetProgressColor(context.Status)" />
+                                        </MudTd>
+                                        <MudTd>@context.Progress.CurrentLoss.ToString("F4")</MudTd>
+                                        <MudTd>@(context.Progress.CurrentMetrics.GetValueOrDefault("accuracy", 0).ToString("P2"))</MudTd>
+                                        <MudTd>@context.StartedAt.ToString("g")</MudTd>
+                                        <MudTd>
+                                            @if (context.Status == TrainingStatus.Running)
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Filled.Pause" Size="Size.Small" @onclick="@(() => PauseJob(context))" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Color="Color.Error" @onclick="@(() => CancelJob(context))" />
+                                            }
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info">No training jobs found for this experiment.</MudAlert>
+                            }
+                        </div>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="Configuration">
+                        <div class="pa-4">
+                            <MudText Typo="Typo.h6" Class="mb-3">Training Configuration</MudText>
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Epochs</MudText>
+                                    <MudText>@_selectedExperiment.Config.TrainingConfig.Epochs</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Batch Size</MudText>
+                                    <MudText>@_selectedExperiment.Config.TrainingConfig.BatchSize</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Learning Rate</MudText>
+                                    <MudText>@_selectedExperiment.Config.TrainingConfig.LearningRate</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Optimizer</MudText>
+                                    <MudText>@_selectedExperiment.Config.TrainingConfig.Optimizer</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Loss Function</MudText>
+                                    <MudText>@_selectedExperiment.Config.TrainingConfig.LossFunction</MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.caption">Early Stopping</MudText>
+                                    <MudText>@(_selectedExperiment.Config.TrainingConfig.EarlyStopping ? "Enabled" : "Disabled")</MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </div>
+                    </MudTabPanel>
+                </MudTabs>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDetailDialog = false">Close</MudButton>
+        @if (_selectedExperiment != null && _selectedExperiment.Status == ExperimentStatus.Created)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => RunExperiment(_selectedExperiment!)" Class="ms-2">Run Experiment</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@* Comparison Dialog *@
+<MudDialog @bind-Visible="@_showComparisonDialog" MaxWidth="MaxWidth.Large" FullWidth="true">
+    <DialogContent>
+        @if (_comparison != null)
+        {
+            <MudText Typo="Typo.h6">Experiment Comparison</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4">@_comparison.Summary</MudText>
+
+            <MudTable Items="@_comparison.Metrics" Hover="true" Striped="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>Experiment_Version</MudTh>
+                    <MudTh>Accuracy</MudTh>
+                    <MudTh>Precision</MudTh>
+                    <MudTh>Recall</MudTh>
+                    <MudTh>F1 Score</MudTh>
+                    <MudTh>Loss</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudChip Color="@(context.Key == _comparison.BestExperimentId ? Color.Success : Color.Default)" Size="Size.Small">@context.Key</MudChip>
+                    </MudTd>
+                    <MudTd>@context.Value.Accuracy.ToString("P2")</MudTd>
+                    <MudTd>@context.Value.Precision.ToString("P2")</MudTd>
+                    <MudTd>@context.Value.Recall.ToString("P2")</MudTd>
+                    <MudTd>@context.Value.F1Score.ToString("P2")</MudTd>
+                    <MudTd>@context.Value.Loss.ToString("F4")</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.h6" Class="mb-2">Detailed Comparison</MudText>
+            <MudPaper Class="pa-3" Elevation="1" Variant="Variant.Outlined">
+                <pre><code>@System.Text.Json.JsonSerializer.Serialize(_comparison.DetailedComparison, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</code></pre>
+            </MudPaper>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showComparisonDialog = false">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    List<Experiment> _experiments = new();
+    List<Experiment> _filteredExperiments = new();
+    List<ModelMetadata> _availableModels = new();
+    List<string> _availableModelVersions = new();
+    List<string> _availableDatasetVersions = new() { "1.0.0", "1.1.0", "2.0.0" };
+    bool _isLoading = true;
+    string _searchString = "";
+    ExperimentStatus? _statusFilter;
+    bool _multiSelection = false;
+    HashSet<Experiment> _selectedExperiments = new();
+
+    // Create dialog
+    bool _showCreateDialog = false;
+    string _newExperimentName = "";
+    string _newExperimentDescription = "";
+    string _newExperimentModelId = "";
+    List<string> _newExperimentVersions = new();
+    string _newExperimentDatasetVersion = "1.0.0";
+    string _expDatasetPath = "";
+    string _expValDatasetPath = "";
+    int _expEpochs = 10;
+    int _expBatchSize = 32;
+    double _expLearningRate = 0.001;
+    string _expOptimizer = "adam";
+    string _expLossFunction = "cross_entropy";
+
+    // Detail dialog
+    bool _showDetailDialog = false;
+    Experiment? _selectedExperiment;
+    List<TrainingJob> _experimentJobs = new();
+
+    // Comparison dialog
+    bool _showComparisonDialog = false;
+    ExperimentComparison? _comparison;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            _experiments = (await ExperimentTracker.ListExperimentsAsync(new ExperimentQuery(), CancellationToken.None)).ToList();
+            _filteredExperiments = _experiments.ToList();
+
+            var models = await (new HttpClient()).GetFromJsonAsync<List<ModelMetadata>>("/api/v1/ai/models");
+            if (models != null)
+            {
+                _availableModels = models;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load experiments");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    void ApplyFilters()
+    {
+        var query = _experiments.AsQueryable();
+        
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            query = query.Where(e => e.Name.Contains(_searchString, StringComparison.OrdinalIgnoreCase) 
+                || e.ExperimentId.Contains(_searchString));
+        }
+        
+        if (_statusFilter.HasValue)
+            query = query.Where(e => e.Status == _statusFilter.Value);
+
+        _filteredExperiments = query.OrderByDescending(e => e.CreatedAt).ToList();
+    }
+
+    void RowClicked(TableRowClickEventArgs<Experiment> args)
+    {
+        if (args.Item != null)
+        {
+            if (_multiSelection)
+            {
+                if (_selectedExperiments.Contains(args.Item))
+                    _selectedExperiments.Remove(args.Item);
+                else
+                    _selectedExperiments.Add(args.Item);
+            }
+            else
+            {
+                ViewExperiment(args.Item);
+            }
+        }
+    }
+
+    void ViewExperiment(Experiment experiment)
+    {
+        _selectedExperiment = experiment;
+        _showDetailDialog = true;
+        
+        // Load related training jobs
+        LoadExperimentJobs(experiment.ExperimentId);
+    }
+
+    async Task LoadExperimentJobs(string experimentId)
+    {
+        try
+        {
+            var jobs = await TrainingOrchestrator.ListTrainingJobsAsync(
+                new TrainingJobQuery { ModelId = _selectedExperiment?.ModelId }, 
+                CancellationToken.None);
+            
+            _experimentJobs = jobs.Where(j => j.Artifacts.ContainsKey("experiment_id") 
+                && j.Artifacts["experiment_id"].ToString() == experimentId).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load experiment jobs");
+        }
+    }
+
+    async Task CreateExperiment()
+    {
+        var config = new ExperimentConfig(
+            _newExperimentVersions.ToArray(),
+            _newExperimentDatasetVersion,
+            new TrainingConfig(
+                _expDatasetPath,
+                _expValDatasetPath,
+                _expEpochs,
+                _expBatchSize,
+                _expLearningRate,
+                _expOptimizer,
+                _expLossFunction,
+                new Dictionary<string, object>(),
+                true,
+                3,
+                null,
+                new[] { "accuracy", "loss", "f1" }
+            ),
+            new Dictionary<string, object>(),
+            new[] { "accuracy", "f1", "loss" }
+        );
+
+        var request = new CreateExperimentRequest(
+            _newExperimentName,
+            _newExperimentDescription,
+            _newExperimentModelId,
+            config
+        );
+
+        try
+        {
+            var experiment = await ExperimentTracker.CreateExperimentAsync(request, CancellationToken.None);
+            await LoadData();
+            _showCreateDialog = false;
+            
+            // Reset form
+            _newExperimentName = "";
+            _newExperimentDescription = "";
+            _newExperimentModelId = "";
+            _newExperimentVersions.Clear();
+            _newExperimentDatasetVersion = "1.0.0";
+            _expDatasetPath = "";
+            _expValDatasetPath = "";
+            _expEpochs = 10;
+            _expBatchSize = 32;
+            _expLearningRate = 0.001;
+            _expOptimizer = "adam";
+            _expLossFunction = "cross_entropy";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create experiment");
+        }
+    }
+
+    async Task RunExperiment(Experiment experiment)
+    {
+        try
+        {
+            var result = await ExperimentTracker.RunExperimentAsync(experiment.ExperimentId, CancellationToken.None);
+            
+            // Update local list
+            var idx = _experiments.FindIndex(e => e.ExperimentId == experiment.ExperimentId);
+            if (idx >= 0)
+            {
+                _experiments[idx] = result;
+                _filteredExperiments = _filteredExperiments.Select(e => e.ExperimentId == experiment.ExperimentId ? result : e).ToList();
+            }
+            
+            if (_selectedExperiment?.ExperimentId == experiment.ExperimentId)
+            {
+                _selectedExperiment = result;
+                LoadExperimentJobs(experiment.ExperimentId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to run experiment");
+        }
+    }
+
+    async Task CancelExperiment(Experiment experiment)
+    {
+        // Would cancel related training jobs
+    }
+
+    async Task CompareExperiments()
+    {
+        if (_selectedExperiments.Count < 2) return;
+
+        var ids = _selectedExperiments.Select(e => e.ExperimentId).ToArray();
+        
+        try
+        {
+            _comparison = await ExperimentTracker.CompareExperimentsAsync(ids, CancellationToken.None);
+            _showComparisonDialog = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to compare experiments");
+        }
+    }
+
+    async Task PauseJob(TrainingJob job)
+    {
+        await TrainingOrchestrator.PauseTrainingAsync(job.JobId, CancellationToken.None);
+        LoadExperimentJobs(_selectedExperiment!.ExperimentId);
+    }
+
+    async Task CancelJob(TrainingJob job)
+    {
+        await TrainingOrchestrator.CancelTrainingAsync(job.JobId, CancellationToken.None);
+        LoadExperimentJobs(_selectedExperiment!.ExperimentId);
+    }
+
+    Color GetStatusColor(ExperimentStatus status) => status switch
+    {
+        ExperimentStatus.Completed => Color.Success,
+        ExperimentStatus.Running => Color.Primary,
+        ExperimentStatus.Failed => Color.Error,
+        ExperimentStatus.Cancelled => Color.Default,
+        _ => Color.Info
+    };
+
+    Color GetTrainingStatusColor(TrainingStatus status) => status switch
+    {
+        TrainingStatus.Running => Color.Success,
+        TrainingStatus.Completed => Color.Success,
+        TrainingStatus.Paused => Color.Warning,
+        TrainingStatus.Queued => Color.Info,
+        TrainingStatus.Failed => Color.Error,
+        TrainingStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    Color GetProgressColor(TrainingStatus status) => status switch
+    {
+        TrainingStatus.Running => Color.Primary,
+        TrainingStatus.Completed => Color.Success,
+        TrainingStatus.Paused => Color.Warning,
+        TrainingStatus.Failed => Color.Error,
+        _ => Color.Default
+    };
+}

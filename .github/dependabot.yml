@@ -1,0 +1,57 @@
+# Dependabot configuration for KKBOT
+version: 2
+updates:
+  # .NET dependencies
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "nuget"
+    groups:
+      microsoft-packages:
+        patterns:
+          - "Microsoft.*"
+      serilog-packages:
+        patterns:
+          - "Serilog*"
+      entityframework-packages:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+      testing-packages:
+        patterns:
+          - "xunit*"
+          - "Moq"
+          - "FluentAssertions"
+      blazor-packages:
+        patterns:
+          - "MudBlazor"
+          - "Microsoft.AspNetCore.Components*"
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

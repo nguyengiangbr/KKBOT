@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Plugin.SampleGame</AssemblyName>
+    <RootNamespace>KKBOT.Plugin.SampleGame</RootNamespace>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Copy output to plugins folder for easy testing -->
+  <Target Name="CopyToPluginsFolder" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)plugins" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(SolutionDir)plugins" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths)" DestinationFolder="$(SolutionDir)plugins" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll' And '%(ReferenceCopyLocalPaths.FileName)' != 'KKBOT.Plugins.Abstractions' And '%(ReferenceCopyLocalPaths.FileName)' != 'KKBOT.Perception.Abstractions' And '%(ReferenceCopyLocalPaths.FileName)' != 'KKBOT.Device.Abstractions' And '%(ReferenceCopyLocalPaths.FileName)' != 'KKBOT.AI.Abstractions'" />
+  </Target>
+
+</Project>
