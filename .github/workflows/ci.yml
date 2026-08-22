@@ -58,7 +58,7 @@ jobs:
           retention-days: 7
 
       - name: Report coverage
-        uses: danielpalme/ReportGenerator-GitHub-Action@5.2.1
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.11
         if: always()
         with:
           reports: '**/coverage.cobertura.xml'
