@@ -1,0 +1,636 @@
+syntax = "proto3";
+
+package kkbott.agent.coordination.v1;
+
+option csharp_namespace = "KKBOT.Agent.Coordination.Grpc";
+
+// Agent Registry Service
+service AgentRegistry {
+  // Register a new agent
+  rpc RegisterAgent(RegisterAgentRequest) returns (RegisterAgentResponse);
+  
+  // Unregister an agent
+  rpc UnregisterAgent(UnregisterAgentRequest) returns (UnregisterAgentResponse);
+  
+  // Get agent info
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse);
+  
+  // List all agents
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  
+  // Find agents by capability
+  rpc FindAgentsByCapability(FindAgentsByCapabilityRequest) returns (FindAgentsByCapabilityResponse);
+  
+  // Find best agent for task
+  rpc FindBestAgentForTask(FindBestAgentForTaskRequest) returns (FindBestAgentForTaskResponse);
+  
+  // Update agent status
+  rpc UpdateAgentStatus(UpdateAgentStatusRequest) returns (UpdateAgentStatusResponse);
+  
+  // Heartbeat
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // Watch for agent changes (streaming)
+  rpc WatchAgents(WatchAgentsRequest) returns (stream WatchAgentsResponse);
+}
+
+// Message Bus Service
+service MessageBus {
+  // Publish a message
+  rpc Publish(PublishRequest) returns (PublishResponse);
+  
+  // Request-response pattern
+  rpc RequestResponse(RequestResponseRequest) returns (RequestResponseResponse);
+  
+  // Broadcast to all agents
+  rpc Broadcast(BroadcastRequest) returns (BroadcastResponse);
+  
+  // Subscribe to messages (streaming)
+  rpc Subscribe(SubscribeRequest) returns (stream AgentMessage);
+  
+  // Unsubscribe
+  rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
+}
+
+// Coordination Service
+service CoordinationService {
+  // Create coordination group
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  
+  // Join group
+  rpc JoinGroup(JoinGroupRequest) returns (JoinGroupResponse);
+  
+  // Leave group
+  rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
+  
+  // Get group info
+  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
+  
+  // List groups for agent
+  rpc ListGroupsForAgent(ListGroupsForAgentRequest) returns (ListGroupsForAgentResponse);
+  
+  // Trigger coordination
+  rpc Coordinate(CoordinateRequest) returns (CoordinateResponse);
+  
+  // Run consensus
+  rpc RunConsensus(RunConsensusRequest) returns (RunConsensusResponse);
+  
+  // Elect leader
+  rpc ElectLeader(ElectLeaderRequest) returns (ElectLeaderResponse);
+  
+  // Sync state
+  rpc SyncState(SyncStateRequest) returns (SyncStateResponse);
+  
+  // Watch group events (streaming)
+  rpc WatchGroup(WatchGroupRequest) returns (stream GroupEvent);
+}
+
+// Distributed Lock Service
+service DistributedLockService {
+  // Acquire lock
+  rpc AcquireLock(AcquireLockRequest) returns (AcquireLockResponse);
+  
+  // Release lock
+  rpc ReleaseLock(ReleaseLockRequest) returns (ReleaseLockResponse);
+  
+  // Extend lock
+  rpc ExtendLock(ExtendLockRequest) returns (ExtendLockResponse);
+  
+  // Get lock info
+  rpc GetLockInfo(GetLockInfoRequest) returns (GetLockInfoResponse);
+  
+  // Watch lock (streaming)
+  rpc WatchLock(WatchLockRequest) returns (stream LockEvent);
+}
+
+// Message definitions
+
+// Agent Registry Messages
+message RegisterAgentRequest {
+  AgentInfo agent = 1;
+}
+
+message RegisterAgentResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message UnregisterAgentRequest {
+  string agent_id = 1;
+}
+
+message UnregisterAgentResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GetAgentRequest {
+  string agent_id = 1;
+}
+
+message GetAgentResponse {
+  AgentInfo agent = 1;
+  bool found = 2;
+}
+
+message ListAgentsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string status_filter = 3;
+}
+
+message ListAgentsResponse {
+  repeated AgentInfo agents = 1;
+  int32 total = 2;
+}
+
+message FindAgentsByCapabilityRequest {
+  string capability = 1;
+}
+
+message FindAgentsByCapabilityResponse {
+  repeated AgentInfo agents = 1;
+}
+
+message FindBestAgentForTaskRequest {
+  AgentTask task = 1;
+}
+
+message FindBestAgentForTaskResponse {
+  AgentInfo agent = 1;
+  bool found = 2;
+}
+
+message UpdateAgentStatusRequest {
+  string agent_id = 1;
+  AgentStatus status = 2;
+}
+
+message UpdateAgentStatusResponse {
+  bool success = 1;
+}
+
+message HeartbeatRequest {
+  string agent_id = 1;
+  AgentStatus status = 2;
+}
+
+message HeartbeatResponse {
+  bool success = 1;
+}
+
+message WatchAgentsRequest {
+  string filter = 1;
+}
+
+message WatchAgentsResponse {
+  string event_type = 1; // "added", "updated", "removed"
+  AgentInfo agent = 2;
+}
+
+// Message Bus Messages
+message PublishRequest {
+  AgentMessage message = 1;
+}
+
+message PublishResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message RequestResponseRequest {
+  AgentMessage request = 1;
+  int32 timeout_ms = 2;
+}
+
+message RequestResponseResponse {
+  AgentMessage response = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message BroadcastRequest {
+  AgentMessage message = 1;
+}
+
+message BroadcastResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message SubscribeRequest {
+  string agent_id = 1;
+  repeated MessageType message_types = 2;
+}
+
+message UnsubscribeRequest {
+  string agent_id = 1;
+}
+
+message UnsubscribeResponse {
+  bool success = 1;
+}
+
+// Coordination Messages
+message CreateGroupRequest {
+  CoordinationGroup group = 1;
+}
+
+message CreateGroupResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message JoinGroupRequest {
+  string group_id = 1;
+  string agent_id = 2;
+}
+
+message JoinGroupResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message LeaveGroupRequest {
+  string group_id = 1;
+  string agent_id = 2;
+}
+
+message LeaveGroupResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GetGroupRequest {
+  string group_id = 1;
+}
+
+message GetGroupResponse {
+  CoordinationGroup group = 1;
+  bool found = 2;
+}
+
+message ListGroupsForAgentRequest {
+  string agent_id = 1;
+}
+
+message ListGroupsForAgentResponse {
+  repeated CoordinationGroup groups = 1;
+}
+
+message CoordinateRequest {
+  string group_id = 1;
+  CoordinationTrigger trigger = 2;
+}
+
+message CoordinateResponse {
+  CoordinationDecision decision = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message RunConsensusRequest {
+  string group_id = 1;
+  ConsensusProposal proposal = 2;
+}
+
+message RunConsensusResponse {
+  ConsensusResult result = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message ElectLeaderRequest {
+  string group_id = 1;
+}
+
+message ElectLeaderResponse {
+  LeaderAnnouncement announcement = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message SyncStateRequest {
+  string group_id = 1;
+  StateSyncPayload state = 2;
+}
+
+message SyncStateResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message GroupEvent {
+  string event_type = 1; // "member_joined", "member_left", "leader_changed", "task_assigned"
+  string group_id = 2;
+  string agent_id = 3;
+  string payload = 4; // JSON
+  int64 timestamp = 5;
+}
+
+// Lock Messages
+message AcquireLockRequest {
+  string resource_id = 1;
+  string owner_id = 2;
+  int32 ttl_seconds = 3;
+}
+
+message AcquireLockResponse {
+  bool acquired = 1;
+  string error = 2;
+}
+
+message ReleaseLockRequest {
+  string resource_id = 1;
+  string owner_id = 2;
+}
+
+message ReleaseLockResponse {
+  bool released = 1;
+  string error = 2;
+}
+
+message ExtendLockRequest {
+  string resource_id = 1;
+  string owner_id = 2;
+  int32 ttl_seconds = 3;
+}
+
+message ExtendLockResponse {
+  bool extended = 1;
+  string error = 2;
+}
+
+message GetLockInfoRequest {
+  string resource_id = 1;
+}
+
+message GetLockInfoResponse {
+  LockInfo lock = 1;
+  bool exists = 2;
+}
+
+message LockEvent {
+  string event_type = 1; // "acquired", "released", "expired", "extended"
+  string resource_id = 2;
+  string owner_id = 3;
+  int64 timestamp = 4;
+}
+
+// Common Types
+
+message AgentInfo {
+  string agent_id = 1;
+  string name = 2;
+  AgentType type = 3;
+  AgentStatus status = 4;
+  AgentCapabilities capabilities = 4;
+  map<string, string> metadata = 5;
+  int64 last_heartbeat = 6;
+  string endpoint = 7;
+}
+
+enum AgentType {
+  AGENT_TYPE_UNSPECIFIED = 0;
+  AGENT_TYPE_REACTIVE = 1;
+  AGENT_TYPE_PLANNING = 2;
+  AGENT_TYPE_LEARNING = 3;
+  AGENT_TYPE_HYBRID = 4;
+}
+
+enum AgentStatus {
+  AGENT_STATUS_UNSPECIFIED = 0;
+  AGENT_STATUS_OFFLINE = 1;
+  AGENT_STATUS_ONLINE = 2;
+  AGENT_STATUS_BUSY = 3;
+  AGENT_STATUS_DEGRADED = 4;
+  AGENT_STATUS_MAINTENANCE = 5;
+}
+
+message AgentCapabilities {
+  repeated string skills = 1;
+  repeated string supported_task_types = 2;
+  ResourceCapacity capacity = 3;
+  repeated string tags = 4;
+  int32 max_concurrent_tasks = 5;
+}
+
+message ResourceCapacity {
+  double cpu_cores = 1;
+  int64 memory_bytes = 2;
+  int32 gpu_count = 3;
+  int64 storage_bytes = 4;
+}
+
+message AgentTask {
+  string task_id = 1;
+  string task_type = 2;
+  map<string, string> parameters = 2;
+  TaskPriority priority = 3;
+  int64 queued_at = 4;
+  int64 deadline = 5;
+  repeated string required_capabilities = 6;
+  string assigned_agent_id = 7;
+  TaskStatus status = 8;
+}
+
+enum TaskPriority {
+  TASK_PRIORITY_UNSPECIFIED = 0;
+  TASK_PRIORITY_LOW = 1;
+  TASK_PRIORITY_NORMAL = 2;
+  TASK_PRIORITY_HIGH = 3;
+  TASK_PRIORITY_CRITICAL = 4;
+}
+
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_QUEUED = 1;
+  TASK_STATUS_ASSIGNED = 2;
+  TASK_STATUS_RUNNING = 3;
+  TASK_STATUS_COMPLETED = 4;
+  TASK_STATUS_FAILED = 5;
+  TASK_STATUS_CANCELLED = 6;
+}
+
+message AgentMessage {
+  string message_id = 1;
+  MessageType type = 2;
+  string from_agent_id = 3;
+  string to_agent_id = 4;
+  string correlation_id = 5;
+  string payload_type = 6;
+  string payload = 7;
+  map<string, string> headers = 8;
+  int64 timestamp = 9;
+  int32 ttl_ms = 10;
+  int32 priority = 11;
+}
+
+enum MessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+  MESSAGE_TYPE_HEARTBEAT = 1;
+  MESSAGE_TYPE_REGISTER = 2;
+  MESSAGE_TYPE_UNREGISTER = 3;
+  MESSAGE_TYPE_AGENT_INFO = 4;
+  MESSAGE_TYPE_TASK_REQUEST = 10;
+  MESSAGE_TYPE_TASK_RESPONSE = 11;
+  MESSAGE_TYPE_TASK_PROGRESS = 12;
+  MESSAGE_TYPE_TASK_CANCEL = 13;
+  MESSAGE_TYPE_DELEGATE_TASK = 20;
+  MESSAGE_TYPE_DELEGATE_RESPONSE = 21;
+  MESSAGE_TYPE_CONSENSUS_PROPOSE = 30;
+  MESSAGE_TYPE_CONSENSUS_VOTE = 31;
+  MESSAGE_TYPE_CONSENSUS_RESULT = 32;
+  MESSAGE_TYPE_LEADER_ELECTION = 40;
+  MESSAGE_TYPE_LEADER_ANNOUNCE = 41;
+  MESSAGE_TYPE_STATE_SYNC = 50;
+  MESSAGE_TYPE_STATE_DELTA = 51;
+  MESSAGE_TYPE_SNAPSHOT_REQUEST = 52;
+  MESSAGE_TYPE_SNAPSHOT_RESPONSE = 53;
+  MESSAGE_TYPE_EVENT_PUBLISH = 60;
+  MESSAGE_TYPE_EVENT_SUBSCRIBE = 61;
+  MESSAGE_TYPE_EVENT_UNSUBSCRIBE = 62;
+  MESSAGE_TYPE_ERROR = 90;
+  MESSAGE_TYPE_ACK = 91;
+  MESSAGE_TYPE_NAK = 92;
+}
+
+message CoordinationGroup {
+  string group_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string member_agent_ids = 4;
+  GroupCoordinationMode mode = 5;
+  string leader_id = 6;
+  GroupPolicy policy = 7;
+  int64 created_at = 8;
+}
+
+enum GroupCoordinationMode {
+  GROUP_COORDINATION_MODE_UNSPECIFIED = 0;
+  GROUP_COORDINATION_MODE_COOPERATIVE = 1;
+  GROUP_COORDINATION_MODE_HIERARCHICAL = 2;
+  GROUP_COORDINATION_MODE_COMPETITIVE = 3;
+  GROUP_COORDINATION_MODE_SWARM = 4;
+}
+
+message GroupPolicy {
+  bool require_consensus_for_decisions = 1;
+  ConsensusThreshold threshold = 2;
+  int64 task_timeout_ms = 3;
+  int32 max_retries = 4;
+  bool allow_dynamic_membership = 5;
+  repeated string required_capabilities = 6;
+}
+
+message ConsensusThreshold {
+  double required_ratio = 1;
+  int32 min_voters = 2;
+  bool require_unanimous = 3;
+}
+
+message CoordinationDecision {
+  DecisionType type = 1;
+  map<string, string> actions = 2; // JSON serialized
+  string reasoning = 2;
+  double confidence = 3;
+  int64 valid_for_ms = 3;
+}
+
+enum DecisionType {
+  DECISION_TYPE_UNSPECIFIED = 0;
+  DECISION_TYPE_ASSIGN_TASK = 1;
+  DECISION_TYPE_REBALANCE_LOAD = 2;
+  DECISION_TYPE_ELECT_LEADER = 3;
+  DECISION_TYPE_SCALE_GROUP = 4;
+  DECISION_TYPE_CHANGE_POLICY = 5;
+  DECISION_TYPE_EMERGENCY_STOP = 6;
+  DECISION_TYPE_NO_ACTION = 7;
+}
+
+message ConsensusProposal {
+  string proposal_id = 1;
+  string proposer_id = 2;
+  ConsensusType type = 3;
+  string description = 4;
+  map<string, string> data = 5; // JSON
+  int64 voting_period_ms = 6;
+  ConsensusThreshold threshold = 7;
+}
+
+enum ConsensusType {
+  CONSENSUS_TYPE_UNSPECIFIED = 0;
+  CONSENSUS_TYPE_LEADER_ELECTION = 1;
+  CONSENSUS_TYPE_TASK_ASSIGNMENT = 2;
+  CONSENSUS_TYPE_RESOURCE_ALLOCATION = 3;
+  CONSENSUS_TYPE_POLICY_CHANGE = 4;
+  CONSENSUS_TYPE_EMERGENCY_STOP = 5;
+  CONSENSUS_TYPE_CUSTOM = 6;
+}
+
+message ConsensusVote {
+  string proposal_id = 1;
+  string voter_id = 2;
+  bool approve = 3;
+  string reason = 4;
+  int64 timestamp = 5;
+}
+
+message ConsensusResult {
+  string proposal_id = 1;
+  ConsensusOutcome outcome = 2;
+  int32 approve_count = 3;
+  int32 reject_count = 4;
+  int32 abstain_count = 5;
+  map<string, string> decided_data = 6; // JSON
+  int64 decided_at = 7;
+}
+
+enum ConsensusOutcome {
+  CONSENSUS_OUTCOME_UNSPECIFIED = 0;
+  CONSENSUS_OUTCOME_APPROVED = 1;
+  CONSENSUS_OUTCOME_REJECTED = 2;
+  CONSENSUS_OUTCOME_TIMEOUT = 3;
+  CONSENSUS_OUTCOME_INSUFFICIENT_VOTERS = 4;
+}
+
+message LeaderAnnouncement {
+  string election_id = 1;
+  string leader_id = 2;
+  int32 term = 3;
+  int64 elected_at = 4;
+  map<string, string> metadata = 5;
+}
+
+message StateSyncPayload {
+  string sync_id = 1;
+  SyncType type = 2;
+  string entity_id = 3;
+  string entity_type = 4;
+  string state_json = 5;
+  int64 version = 6;
+  int64 timestamp = 7;
+}
+
+enum SyncType {
+  SYNC_TYPE_UNSPECIFIED = 0;
+  SYNC_TYPE_FULL = 1;
+  SYNC_TYPE_DELTA = 2;
+  SYNC_TYPE_SNAPSHOT = 3;
+  SYNC_TYPE_INVALIDATE = 4;
+}
+
+message LockInfo {
+  string resource_id = 1;
+  string owner_id = 2;
+  int64 acquired_at = 3;
+  int64 expires_at = 4;
+}
+
+message TaskAssignmentAction {
+  string task_id = 1;
+  string task_type = 2;
+  map<string, string> parameters = 2;
+  TaskPriority priority = 3;
+  int64 deadline = 3;
+}

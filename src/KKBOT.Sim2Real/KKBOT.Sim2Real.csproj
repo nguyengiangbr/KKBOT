@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Sim2Real</AssemblyName>
+    <RootNamespace>KKBOT.Sim2Real
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.Sim2Real.Abstractions\KKBOT.Sim2Real.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Sim2Real.DomainRandomization\KKBOT.Sim2Real.DomainRandomization.csproj" />
+    <ProjectReference Include="..\KKBOT.Sim2Real.DomainAdaptation\KKBOT.Sim2Real.DomainAdaptation.csproj" />
+    <ProjectReference Include="..\KKBOT.Sim2Real.RewardModeling\KKBOT.Sim2Real.RewardModeling.csproj" />
+    <ProjectReference Include="..\KKBOT.Sim2Real.PolicyDeployment\KKBOT.Sim2Real.PolicyDeployment.csproj" />
+    <ProjectReference Include="..\KKBOT.Sim2Real.Evaluation\KKBOT.Sim2Real.Evaluation.csproj" />
+    <ProjectReference Include="..\..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\..\KKBOT.MLPlatform.Abstractions\KKBOT.MLPlatform.Abstractions.csproj" />
+    <ProjectReference Include="..\..\KKBOT.MLPlatform.ModelServer\KKBOT.MLPlatform.ModelServer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

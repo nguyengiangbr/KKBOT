@@ -4,11 +4,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using KKBOT.Orchestration.DynamicDag;
 using KKBOT.Orchestration.EventSourcing;
 using KKBOT.Orchestration.MultiTenancy;
+using KKBOT.Orchestration.Projections;
 using KKBOT.Orchestration.Saga;
 using KKBOT.Persistence.EfCore;
+using KKBOT.Observability;
 
 namespace KKBOT.Orchestration;
 
@@ -16,20 +19,31 @@ public static class OrchestrationExtensions
 {
     public static IServiceCollection AddKkbotOrchestration(this IServiceCollection services, IConfiguration configuration)
     {
-        // Core orchestration services
+        services.Configure<EventStoreOptions>(configuration.GetSection("EventStore"));
+
         services.AddSingleton<EventStore>();
+        services.AddSingleton<IEventStore>(sp => sp.GetRequiredService<EventStore>());
         services.AddSingleton<DagScheduler>();
         services.AddSingleton<PluginLoader>();
         services.AddSingleton<InstanceOrchestrator>();
 
-        // Advanced orchestration
+        services.AddSingleton<EventUpcaster>();
+        services.AddSingleton<UpcastPipeline>();
+        services.AddSingleton<EventVersionRegistry>();
+
+        services.AddSingleton<InstanceStateProjection>();
+        services.AddSingleton<JobExecutionProjection>();
+        services.AddSingleton<RecoveryProjection>();
+        services.AddSingleton<MetricsProjection>();
+        services.AddSingleton<OrchestrationHealthProjection>();
+
+        services.AddHostedService<ProjectionRegistrationService>();
+
         services.AddSingleton<IDynamicDagBuilder, TaskDagBuilder>();
         services.AddSingleton<IStateMachineToDagConverter, StateMachineToDagConverter>();
-        services.AddSingleton<IEventStore, EventStore>();
         services.AddSingleton<ISagaOrchestrator, SagaOrchestrator>();
         services.AddSingleton<ISagaRepository, InMemorySagaRepository>();
 
-        // Event Store DbContext
         services.AddDbContext<EventStoreDbContext>(options =>
         {
             var connectionString = configuration.GetConnectionString("KkbotEventStore") 
@@ -38,19 +52,40 @@ public static class OrchestrationExtensions
             options.UseSqlite(connectionString);
         });
 
-        // Multi-tenancy
         services.AddSingleton<ITenantProvider, InMemoryTenantProvider>();
         services.AddSingleton<ITenantResolver, HeaderTenantResolver>();
-
-        // Register tenant-aware repositories
-        // services.AddScoped<ITenantScopedRepository<Instance>, EfInstanceRepository>();
-        // services.AddScoped<ITenantScopedRepository<Job>, EfJobRepository>();
 
         return services;
     }
 }
 
-// In-memory implementations for development
+public sealed class ProjectionRegistrationService : BackgroundService
+{
+    private readonly IEventStore _eventStore;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<ProjectionRegistrationService> _logger;
+
+    public ProjectionRegistrationService(IEventStore eventStore, IServiceProvider serviceProvider, ILogger<ProjectionRegistrationService> logger)
+    {
+        _eventStore = eventStore;
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await ProjectionRegistry.RegisterAllAsync(_eventStore, _serviceProvider, stoppingToken);
+            _logger.LogInformation("All projections registered successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to register projections");
+        }
+    }
+}
+
 public sealed class InMemorySagaRepository : ISagaRepository
 {
     private readonly Dictionary<Guid, ISaga> _sagas = new();
@@ -79,7 +114,6 @@ public sealed class InMemoryTenantProvider : ITenantProvider
 
     public InMemoryTenantProvider()
     {
-        // Default tenant
         _tenants["default"] = new TenantContext
         {
             TenantId = "default",

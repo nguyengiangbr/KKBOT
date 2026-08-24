@@ -1,50 +1,133 @@
 # Contributing to KKBOT
 
-Thank you for considering contributing to **KKBOT**! This document outlines the process we use to accept contributions.
+Thank you for your interest in contributing to KKBOT! This document provides guidelines for contributing to the project.
 
-## How to contribute
+## Code of Conduct
 
-1. **Fork the repository** and clone your fork locally.
-2. **Create a branch** for your feature or bug‑fix:
-   ```bash
-   git checkout -b feature/awesome-feature
-   ```
-3. **Make your changes**.  Follow the coding conventions defined in the `.editorconfig` file and keep file‑scoped namespaces for all C# files.
-4. **Add tests** for any new public API or behaviour.
-5. **Run the test suite** locally:
-   ```bash
-   dotnet test
-   ```
-   All tests must pass and code coverage should stay above the target set in the CI pipeline.
-6. **Commit with a clear message** and push to your fork:
-   ```bash
-   git push origin feature/awesome-feature
-   ```
-7. **Open a Pull Request** against the `main` branch of the upstream repository.
-   - Provide a concise description of the change.
-   - Reference any related issue number (e.g. `#42`).
-   - Mention if the PR adds new documentation.
+Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Review process
+## How to Contribute
 
-- Maintainers will review the PR for correctness, style, and test coverage.
-- Small changes may be merged after a single approval; larger changes may require additional reviewers.
-- If changes are requested, push new commits to the same branch – the PR will update automatically.
+### Reporting Issues
 
-## Style guide & best practices
+Before creating an issue, please check if it already exists. When creating an issue, please include:
 
-- **C# version**: target **.NET 10**; use the latest language features.
-- **Naming**: PascalCase for types and members, camelCase for local variables.
-- **File‑scoped namespaces** for all source files.
-- **Async‑await** for all I/O‑bound operations; **no `Thread.Sleep`** – use `Task.Delay`.
-- **Error handling**: use the `Result<T>` / `Error` pattern defined in `KKBOT.Domain.Common`.
-- **Logging**: use the injected `ILogger<T>` and the `LogEnricher` from `KKBOT.Observability` to add context fields (`InstanceId`, `DeviceId`, etc.).
-- **Unit tests**: use **xUnit**, **Moq**, and **FluentAssertions**. Place tests under the corresponding `tests/` project.
+- Clear title and description
+- Steps to reproduce
+- Expected vs actual behavior
+- Environment details (OS, .NET version, etc.)
+- Relevant logs/screenshots
+
+### Pull Request Process
+
+1. **Fork** the repository
+2. **Create a feature branch** from `main`
+3. **Make your changes** with tests
+4. **Run tests** to ensure nothing breaks
+5. **Submit a Pull Request** with clear description
+
+### Commit Message Convention
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+Types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Formatting, missing semi-colons, etc.
+- `refactor`: Code restructuring
+- `perf`: Performance improvement
+- `test`: Adding tests
+- `chore`: Maintenance
+
+Example:
+```
+feat(agent): add LLM-powered planner with streaming support
+fix(perception): handle null template matches gracefully
+docs(arch): update architecture diagram for WASM sandbox
+```
+
+## Development Setup
+
+### Prerequisites
+
+- .NET 10 SDK
+- Docker 24+ (for integration tests)
+- Redis 7+ (for coordination features)
+- Ollama (for AI features)
+
+### Local Development
+
+```bash
+# Clone and build
+git clone https://github.com/your-org/kkbot.git
+cd kkbot
+dotnet restore
+dotnet build
+
+# Run tests
+dotnet test
+
+# Run API
+dotnet run --project src/KKBOT.API
+
+# Run Dashboard
+dotnet run --project src/KKBOT.UI.Dashboard
+```
+
+### Code Style
+
+We use:
+- **EditorConfig** for consistent formatting
+- **StyleCop.Analyzers** for code style
+- **Nullable** reference types enabled
+- **Async/await** preferred over sync
+
+Run formatter:
+```bash
+dotnet format
+```
+
+### Testing
+
+```bash
+# Run all tests
+dotnet test
+
+# Run specific test project
+dotnet test tests/KKBOT.Orchestration.Integration.Tests
+
+# Run with coverage
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+### Adding New Game Plugins
+
+1. Create new project: `src/KKBOT.Plugin.YourModule`
+2. Reference required abstractions
+3. Implement `IGameModule`
+4. Add to solution
+5. Add tests in `tests/KKBOT.Plugin.YourModule.Tests`
+
+## Reporting Security Issues
+
+Please **do not** report security vulnerabilities through public GitHub issues. Instead, email security@kkbot.example.com.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same **MIT License** as the project.
+By contributing, you agree that your contributions will be licensed under the MIT License.
 
----
+## Questions?
 
-*Happy hacking!*
+- Open a [Discussion](https://github.com/your-org/kkbot/discussions)
+- Check [Documentation](https://docs.kkbot.example.com)
+
+Thank you for contributing to KKBOT!

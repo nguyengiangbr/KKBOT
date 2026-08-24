@@ -7,14 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using KKBOT.Domain.Models;
 using KKBOT.Persistence.Abstractions;
+using KKBOT.Identity.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace KKBOT.API.Controllers;
 
-/// <summary>
-/// Instance management API
-/// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
@@ -30,35 +29,32 @@ public sealed class InstancesController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all instances
-    /// </summary>
     [HttpGet]
+    [RequirePermission(KKBOTPermissions.InstanceRead)]
     [ProducesResponseType(typeof(IEnumerable<Instance>), 200)]
+    [SwaggerOperation("Get all instances", "Requires instance.read permission")]
     public async Task<ActionResult<IEnumerable<Instance>>> GetAll(CancellationToken ct)
     {
         var instances = await _repository.GetAllAsync(ct);
         return Ok(instances);
     }
 
-    /// <summary>
-    /// Get instance by ID
-    /// </summary>
     [HttpGet("{id:guid}")]
+    [RequirePermission(KKBOTPermissions.InstanceRead, "instance", "{id}")]
     [ProducesResponseType(typeof(Instance), 200)]
     [ProducesResponseType(404)]
+    [SwaggerOperation("Get instance by ID", "Requires instance.read permission")]
     public async Task<ActionResult<Instance>> GetById(Guid id, CancellationToken ct)
     {
         var instance = await _repository.GetAsync(id, ct);
         return instance is null ? NotFound() : Ok(instance);
     }
 
-    /// <summary>
-    /// Create a new instance
-    /// </summary>
     [HttpPost]
+    [RequirePermission(KKBOTPermissions.InstanceWrite)]
     [ProducesResponseType(typeof(Instance), 201)]
     [ProducesResponseType(400)]
+    [SwaggerOperation("Create a new instance", "Requires instance.write permission")]
     public async Task<ActionResult<Instance>> Create([FromBody] CreateInstanceRequest request, CancellationToken ct)
     {
         var instance = new Instance(Guid.NewGuid(), request.Name, InstanceStatus.Created, null)
@@ -73,13 +69,12 @@ public sealed class InstancesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = instance.Id }, instance);
     }
 
-    /// <summary>
-    /// Update an instance
-    /// </summary>
     [HttpPut("{id:guid}")]
+    [RequirePermission(KKBOTPermissions.InstanceWrite, "instance", "{id}")]
     [ProducesResponseType(typeof(Instance), 200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
+    [SwaggerOperation("Update an instance", "Requires instance.write permission")]
     public async Task<ActionResult<Instance>> Update(Guid id, [FromBody] UpdateInstanceRequest request, CancellationToken ct)
     {
         var instance = await _repository.GetAsync(id, ct);
@@ -100,12 +95,11 @@ public sealed class InstancesController : ControllerBase
         return Ok(instance);
     }
 
-    /// <summary>
-    /// Delete an instance
-    /// </summary>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(KKBOTPermissions.InstanceDelete, "instance", "{id}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
+    [SwaggerOperation("Delete an instance", "Requires instance.delete permission")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var instance = await _repository.GetAsync(id, ct);

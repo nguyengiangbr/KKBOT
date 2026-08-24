@@ -1,0 +1,47 @@
+{
+  "name": "kkbot-pwa-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.16.0",
+    "@mui/material": "^5.14.0",
+    "@mui/icons-material": "^5.14.0",
+    "@mui/x-charts": "^6.10.0",
+    "@mui/x-data-grid": "^6.10.0",
+    "@tanstack/react-query": "^4.32.0",
+    "axios": "^1.5.0",
+    "socket.io-client": "^4.7.0",
+    "zustand": "^4.4.0",
+    "date-fns": "^2.30.0",
+    "react-hook-form": "^7.45.0",
+    "@hookform/resolvers": "^3.3.0",
+    "zod": "^3.22.0",
+    "react-hot-toast": "^2.4.0",
+    "recharts": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.0",
+    "typescript": "^5.0.0",
+    "vite": "^4.4.0",
+    "vite-plugin-pwa": "^0.16.0",
+    "workbox-window": "^7.0.0",
+    "vitest": "^0.34.0"
+  }
+}

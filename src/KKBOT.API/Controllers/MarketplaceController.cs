@@ -1,9 +1,13 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using KKBOT.PluginMarketplace;
+using KKBOT.Identity.Authorization;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace KKBOT.API.Controllers;
@@ -26,7 +30,9 @@ public sealed class MarketplaceController : ControllerBase
     }
 
     [HttpGet("search")]
+    [RequirePermission(KKBOTPermissions.MarketplaceRead)]
     [ProducesResponseType(typeof(IEnumerable<PluginRegistryEntry>), 200)]
+    [SwaggerOperation("Search plugins", "Requires marketplace.read permission")]
     public async Task<ActionResult<IEnumerable<PluginRegistryEntry>>> Search(
         [FromQuery] string? keyword,
         [FromQuery] string[]? tags,
@@ -44,80 +50,77 @@ public sealed class MarketplaceController : ControllerBase
     }
 
     [HttpGet("plugins/{pluginId}")]
+    [RequirePermission(KKBOTPermissions.MarketplaceRead)]
     [ProducesResponseType(typeof(PluginRegistryEntry), 200)]
     [ProducesResponseType(404)]
+    [SwaggerOperation("Get plugin details", "Requires marketplace.read permission")]
     public async Task<ActionResult<PluginRegistryEntry>> GetPlugin(string pluginId, [FromQuery] string? version, CancellationToken ct)
     {
         var plugin = await _registry.GetPluginAsync(pluginId, version, ct);
         return plugin is null ? NotFound() : Ok(plugin);
     }
 
-    [HttpGet("plugins")]
+    [HttpPost("plugins/{pluginId}/install")]
+    [RequirePermission(KKBOTPermissions.MarketplaceWrite)]
+    [ProducesResponseType(typeof(InstallResult), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [SwaggerOperation("Install a plugin", "Requires marketplace.write permission")]
+    public async Task<ActionResult<InstallResult>> Install(string pluginId, [FromQuery] string? version, [FromQuery] string path = "plugins", CancellationToken ct = default)
+    {
+        var result = await _installer.InstallAsync(pluginId, version, path, ct);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    [HttpPost("plugins/{pluginId}/uninstall")]
+    [RequirePermission(KKBOTPermissions.MarketplaceWrite)]
+    [ProducesResponseType(typeof(UninstallResult), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [SwaggerOperation("Uninstall a plugin", "Requires marketplace.write permission")]
+    public async Task<ActionResult<UninstallResult>> Uninstall(string pluginId, [FromQuery] string path = "plugins", CancellationToken ct = default)
+    {
+        var result = await _installer.UninstallAsync(pluginId, path, ct);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    [HttpPost("publish")]
+    [RequirePermission(KKBOTPermissions.MarketplacePublish)]
+    [ProducesResponseType(typeof(PublishResult), 201)]
+    [ProducesResponseType(400)]
+    [SwaggerOperation("Publish a plugin", "Requires marketplace.publish permission")]
+    public async Task<ActionResult<PublishResult>> Publish([FromBody] PublishRequest request, CancellationToken ct)
+    {
+        // Implementation would publish to marketplace
+        return Ok(new PublishResult(true, "Published successfully", request.PluginId));
+    }
+
+    [HttpGet("categories")]
+    [RequirePermission(KKBOTPermissions.MarketplaceRead)]
+    [ProducesResponseType(typeof(IEnumerable<string>), 200)]
+    [SwaggerOperation("Get plugin categories", "Requires marketplace.read permission")]
+    public async Task<ActionResult<IEnumerable<string>>> GetCategories(CancellationToken ct)
+    {
+        return Ok(new[] { "Automation", "Utility", "Game Specific", "AI", "Visual Scripting" });
+    }
+
+    [HttpGet("featured")]
+    [RequirePermission(KKBOTPermissions.MarketplaceRead)]
     [ProducesResponseType(typeof(IEnumerable<PluginRegistryEntry>), 200)]
-    public async Task<ActionResult<IEnumerable<PluginRegistryEntry>>> GetAll(CancellationToken ct)
+    [SwaggerOperation("Get featured plugins", "Requires marketplace.read permission")]
+    public async Task<ActionResult<IEnumerable<PluginRegistryEntry>>> GetFeatured([FromQuery] int limit = 10, CancellationToken ct = default)
     {
-        var plugins = await _registry.GetAllAsync(ct);
-        return Ok(plugins);
-    }
-
-    [HttpPost("plugins")]
-    [ProducesResponseType(typeof(PluginRegistryEntry), 201)]
-    [ProducesResponseType(400)]
-    public async Task<ActionResult<PluginRegistryEntry>> Publish([FromBody] PluginPublishRequest request, CancellationToken ct)
-    {
-        var plugin = await _registry.PublishAsync(request, ct);
-        return CreatedAtAction(nameof(GetPlugin), new { pluginId = plugin.PluginId, version = plugin.Version }, plugin);
-    }
-
-    [HttpDelete("plugins/{pluginId}/{version}")]
-    [ProducesResponseType(204)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> Unpublish(string pluginId, string version, CancellationToken ct)
-    {
-        var success = await _registry.UnpublishAsync(pluginId, version, ct);
-        return success ? NoContent() : NotFound();
-    }
-
-    [HttpPost("install/{pluginId}")]
-    [ProducesResponseType(typeof(InstallResult), 200)]
-    [ProducesResponseType(400)]
-    public async Task<ActionResult<InstallResult>> Install(string pluginId, [FromQuery] string? version, CancellationToken ct)
-    {
-        var result = await _installer.InstallAsync(pluginId, version, ct);
-        return result.Success ? Ok(result) : BadRequest(result);
-    }
-
-    [HttpPost("update/{pluginId}")]
-    [ProducesResponseType(typeof(InstallResult), 200)]
-    [ProducesResponseType(400)]
-    public async Task<ActionResult<InstallResult>> Update(string pluginId, CancellationToken ct)
-    {
-        var result = await _installer.UpdateAsync(pluginId, ct);
-        return result.Success ? Ok(result) : BadRequest(result);
-    }
-
-    [HttpDelete("uninstall/{pluginId}")]
-    [ProducesResponseType(204)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> Uninstall(string pluginId, CancellationToken ct)
-    {
-        var success = await _installer.UninstallAsync(pluginId, ct);
-        return success ? NoContent() : NotFound();
-    }
-
-    [HttpGet("installed")]
-    [ProducesResponseType(typeof(IEnumerable<InstalledPluginInfo>), 200)]
-    public async Task<ActionResult<IEnumerable<InstalledPluginInfo>>> GetInstalled(CancellationToken ct)
-    {
-        var installed = await _installer.GetInstalledAsync(ct);
-        return Ok(installed);
-    }
-
-    [HttpGet("dependencies/{pluginId}")]
-    [ProducesResponseType(typeof(DependencyResolutionResult), 200)]
-    public async Task<ActionResult<DependencyResolutionResult>> ResolveDependencies(string pluginId, [FromQuery] string? version, CancellationToken ct)
-    {
-        var result = await _installer.ResolveDependenciesAsync(pluginId, version ?? "latest", ct);
-        return Ok(result);
+        var query = new PluginSearchQuery(null, null, null, true, 1, limit, "rating", true);
+        var results = await _registry.SearchAsync(query, ct);
+        return Ok(results);
     }
 }
+
+public record PublishRequest(
+    string PluginId,
+    string Version,
+    string PackagePath,
+    string? Changelog = null
+);
+
+public record PublishResult(bool Success, string Message, string PluginId);

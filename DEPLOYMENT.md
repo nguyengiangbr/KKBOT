@@ -1,276 +1,353 @@
-# KKBOT Deployment Guide
+# Deployment Guide
 
 ## Overview
 
-This guide covers deploying KKBOT using Docker, Docker Compose, and Kubernetes (Helm).
+This guide covers deploying KKBOT in various environments: local development, Docker, and Kubernetes.
 
 ## Prerequisites
 
-- Docker 24+ and Docker Compose 2+
-- Kubernetes 1.28+ (for Helm deployment)
-- Helm 3.12+
-- kubectl configured for your cluster
+- .NET 10 SDK
+- Docker 24+
+- Kubernetes 1.28+ (for production)
+- PostgreSQL 16 / SQLite (development)
+- Redis 7+
+- Ollama (for AI features)
 
----
+## Local Development
+
+### 1. Clone and Build
+
+```bash
+git clone https://github.com/your-org/kkbot.git
+cd kkbot
+dotnet restore
+dotnet build
+```
+
+### 2. Run Database Migrations
+
+```bash
+dotnet ef database update --project src/KKBOT.Persistence.EfCore
+```
+
+### 3. Start Services
+
+```bash
+# Terminal 1: Start API
+dotnet run --project src/KKBOT.API
+
+# Terminal 2: Start Dashboard
+dotnet run --project src/KKBOT.UI.Dashboard
+```
+
+### 4. Access Dashboard
+
+Open http://localhost:5000 in browser.
 
 ## Docker Deployment
 
-### Build the Image
+### Development with Docker Compose
 
 ```bash
-# Build locally
-docker build -t kkbot:latest .
-
-# Or use docker-compose
-docker-compose build
-```
-
-### Run with Docker Compose
-
-#### Development
-```bash
-# Uses docker-compose.override.yml for hot reload
 docker-compose up -d
 ```
 
-#### Production
-```bash
-# Set required environment variables
-export ENCRYPTION_PASSPHRASE="your-secure-passphrase"
-export ENCRYPTION_SALT="your-secure-salt"
-export POSTGRES_PASSWORD="secure-db-password"
-export GRAFANA_PASSWORD="secure-grafana-password"
+Services started:
+- kkbot-api (port 8080)
+- kkbot-dashboard (port 8081)
+- postgres (port 5432)
+- redis (port 6379)
+- ollama (port 11434)
+- jaeger (port 16686)
+- prometheus (port 9090)
+- grafana (port 3000)
 
-# Start with production profile
+### Production with Docker Compose
+
+```bash
 docker-compose --profile postgres --profile redis up -d
 ```
 
-#### With Monitoring
-```bash
-docker-compose --profile monitoring up -d
-# Access Prometheus at http://localhost:9090
-# Access Grafana at http://localhost:3000 (admin/admin)
-```
+## Kubernetes Deployment
 
-### Environment Variables
+### Prerequisites
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ENCRYPTION_PASSPHRASE` | Passphrase for AES encryption | Required in production |
-| `ENCRYPTION_SALT` | Salt for key derivation | Required in production |
-| `POSTGRES_PASSWORD` | PostgreSQL password | Required with postgres profile |
-| `GRAFANA_PASSWORD` | Grafana admin password | Required with monitoring profile |
-| `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | Production |
-| `ConnectionStrings__KkbotDb` | Database connection string | `DataSource=/app/data/kkbot.db` |
+- Kubernetes cluster 1.28+
+- Helm 3.12+
+- cert-manager (for TLS)
+- ingress-nginx
 
-### Volumes
-
-- `kkbot_data`: SQLite database, secrets, persistent data
-- `kkbot_logs`: Application logs
-- `postgres_data`: PostgreSQL data (with postgres profile)
-- `redis_data`: Redis data (with redis profile)
-- `prometheus_data`: Prometheus metrics (with monitoring profile)
-- `grafana_data`: Grafana dashboards (with monitoring profile)
-
----
-
-## Kubernetes Deployment (Helm)
-
-### Install Helm Chart
+### Install with Helm
 
 ```bash
-# Add repository (if published)
-helm repo add kkbot https://your-org.github.io/kkbot-helm
+# Add Helm repo
+helm repo add kkbot https://charts.kkbot.example.com
 helm repo update
 
-# Or install from local chart
+# Install
 helm install kkbot ./helm/kkbot \
   --namespace kkbot \
   --create-namespace \
-  --set image.repository=ghcr.io/your-org/kkbot \
-  --set image.tag=v1.0.0
+  -f values-prod.yaml
 ```
 
-### Configuration
-
-Create a `values-prod.yaml` for production:
+### values-prod.yaml Example
 
 ```yaml
-replicaCount: 2
-
 image:
   repository: ghcr.io/your-org/kkbot
-  tag: v1.0.0
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+
+postgresql:
+  enabled: true
+  auth:
+    username: kkbot
+    password: POSTGRES_PASSWORD_PLACEHOLDER
+    database: kkbot
+
+redis:
+  enabled: true
+  auth:
+    password: REDIS_PASSWORD_PLACEHOLDER
+
+ollama:
+  enabled: true
+  gpu:
+    enabled: true
 
 ingress:
   enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
-    - host: kkbot.yourdomain.com
+    - host: kkbot.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: kkbot-tls
       hosts:
-        - kkbot.yourdomain.com
-
-persistence:
-  data:
-    enabled: true
-    storageClass: fast-ssd
-    size: 10Gi
-  logs:
-    enabled: true
-    storageClass: standard
-    size: 5Gi
-
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-
-secrets:
-  create: true
-  encryptionPassphrase: "your-production-passphrase"
-  encryptionSalt: "your-production-salt"
-
-postgresql:
-  enabled: true
-  auth:
-    password: "secure-postgres-password"
-
-redis:
-  enabled: true
+        - kkbot.example.com
 
 monitoring:
   prometheus:
     enabled: true
-    serviceMonitor:
-      enabled: true
+  grafana:
+    enabled: true
+  jaeger:
+    enabled: true
 ```
 
-Then install:
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| CONNECTIONSTRINGS__KKBOTDB | Database connection string | Yes |
+| SECURITY__ENCRYPTIONPASSPHRASE | Encryption passphrase (32 chars) | Yes |
+| SECURITY__ENCRYPTIONSALT | Encryption salt (16 chars) | Yes |
+| JWT__KEY | JWT signing key (32+ chars) | Yes |
+| JWT__ISSUER | JWT issuer | Yes |
+| JWT__AUDIENCE | JWT audience | Yes |
+| AI__OLLAMA__BASEURL | Ollama API URL | No |
+| AI__OLLAMA__MODEL | Default LLM model | No |
+| REDIS__CONNECTIONSTRING | Redis connection string | Yes |
+| TELEGRAM__BOTTOKEN | Telegram bot token | No |
+| TELEGRAM__CHATIDS | Allowed chat IDs (comma-separated) | No |
+
+### Secrets Management
+
+Store secrets in:
+- Kubernetes Secrets
+- HashiCorp Vault
+- Azure Key Vault
+- AWS Secrets Manager
+
+Example Kubernetes Secret:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kkbot-secrets
+  namespace: kkbot
+type: Opaque
+stringData:
+  ConnectionStrings__KkbotDb: "Host=postgres;Database=kkbot;Username=kkbot;Password=xxx"
+  Security__EncryptionPassphrase: "your-32-char-passphrase-here"
+  Security__EncryptionSalt: "your-16-char-salt"
+  Jwt__Key: "your-super-secret-jwt-key-min-32-chars"
+  Jwt__Issuer: "KKBOT"
+  Jwt__Audience: "KKBOT"
+  Redis__ConnectionString: "redis://:password@redis:6379"
+```
+
+## Plugin Deployment
+
+### Building Plugins
+
 ```bash
-helm install kkbot ./helm/kkbot -f values-prod.yaml -n kkbot --create-namespace
+dotnet build src/KKBOT.Plugin.AccountLogin -c Release
+dotnet build src/KKBOT.Plugin.AntiDetection -c Release
+dotnet build src/KKBOT.Plugin.ResourceOptimizer -c Release
 ```
 
-### Upgrade
+### Installing Plugins
+
+Copy plugin DLLs to plugins directory:
 
 ```bash
-helm upgrade kkbot ./helm/kkbot -f values-prod.yaml -n kkbot
+mkdir -p plugins
+cp src/KKBOT.Plugin.AccountLogin/bin/Release/net10.0/KKBOT.Plugin.AccountLogin.dll plugins/
+cp src/KKBOT.Plugin.AntiDetection/bin/Release/net10.0/KKBOT.Plugin.AntiDetection.dll plugins/
+cp src/KKBOT.Plugin.ResourceOptimizer/bin/Release/net10.0/KKBOT.Plugin.ResourceOptimizer.dll plugins/
 ```
 
-### Uninstall
+### WASM Plugins
+
+For Rust-based WASM plugins:
 
 ```bash
-helm uninstall kkbot -n kkbot
+cd samples/wasm-plugin-sample
+cargo build --release --target wasm32-wasi
+cp target/wasm32-wasi/release/kkbot_plugin_sample.wasm plugins/
+cp samples/wasm-plugin-sample/manifest.json plugins/
 ```
-
----
-
-## GitHub Actions CI/CD
-
-The repository includes a comprehensive CI/CD pipeline (`.github/workflows/ci.yml`):
-
-### Pipeline Stages
-
-1. **Build & Test**
-   - Restore dependencies
-   - Build solution
-   - Run unit tests with coverage
-   - Upload test results and coverage reports
-
-2. **Docker Build**
-   - Multi-arch build (amd64, arm64)
-   - Push to GHCR with semantic tags
-   - Generate SBOM
-
-3. **Security Scan**
-   - Trivy filesystem scan
-   - CodeQL analysis
-
-4. **Deploy Staging** (on `develop` branch)
-   - Automatic deployment to staging environment
-
-5. **Deploy Production** (on release)
-   - Manual approval required
-   - Deployment to production environment
-
-### Required Secrets
-
-Configure these in GitHub repository settings:
-
-| Secret | Description |
-|--------|-------------|
-| `GITHUB_TOKEN` | Auto-provided for GHCR push |
-| `KUBECONFIG_STAGING` | kubeconfig for staging cluster |
-| `KUBECONFIG_PRODUCTION` | kubeconfig for production cluster |
-| `ENCRYPTION_PASSPHRASE` | Production encryption passphrase |
-| `ENCRYPTION_SALT` | Production encryption salt |
-| `POSTGRES_PASSWORD` | Production PostgreSQL password |
-| `GRAFANA_PASSWORD` | Production Grafana password |
-
----
 
 ## Monitoring & Observability
 
 ### Health Checks
 
-- **Liveness**: `GET /health` - Kubernetes liveness probe
-- **Readiness**: `GET /health` - Kubernetes readiness probe
-- **Docker**: `curl -f http://localhost:8080/health`
+- API: `GET /health`
+- Dashboard: Built-in health checks
 
-### Metrics (Prometheus)
+### Metrics
 
-The application exposes metrics at `/metrics` (when configured):
+- Prometheus: `GET /metrics`
+- Grafana dashboards: Import from `monitoring/grafana/dashboards/`
 
-- `kkbot_instances_total` - Total instances
-- `kkbot_instances_status` - Instances by status
-- `kkbot_jobs_total` - Total jobs
-- `kkbot_jobs_status` - Jobs by status
-- `kkbot_job_duration_seconds` - Job execution duration
-- `kkbot_plugin_count` - Loaded plugins count
+### Logs
 
-### Grafana Dashboards
+- Loki: Configured via Docker Compose
+- Structured JSON logs in `logs/`
 
-Import the provided dashboards from `monitoring/grafana/dashboards/` or create custom ones using the metrics above.
+### Traces
 
-### Logging
+- Jaeger: http://localhost:16686
+- OTLP: http://localhost:4317
 
-Logs are written to:
-- Console (stdout) - captured by Docker/Kubernetes
-- File: `/app/logs/kkbot-YYYYMMDD.log` - rolling daily, 30 days retention
+## Scaling
 
-Configure log aggregation with:
-- **Loki** + **Promtail** (recommended for Kubernetes)
-- **ELK Stack** (Elasticsearch, Logstash, Kibana)
-- **Datadog** / **New Relic** / **Azure Monitor**
+### Horizontal Pod Autoscaler
 
----
+Configured via Helm values:
+- CPU-based scaling (70% target)
+- Custom metrics scaling (queue depth, active instances)
 
-## Backup & Disaster Recovery
+### Database
+
+- Read replicas for read-heavy workloads
+- Connection pooling (PgBouncer for PostgreSQL)
+
+### Redis
+
+- Cluster mode for high availability
+- Sentinel for failover
+
+## Backup & Recovery
 
 ### Database Backup
 
 ```bash
-# SQLite (development)
-kubectl exec -n kkbot deployment/kkbot -- cp /app/data/kkbot.db /app/data/kkbot.db.backup.$(date +%Y%m%d)
+# PostgreSQL
+pg_dump -h postgres -U kkbot kkbot > backup_$(date +%Y%m%d).sql
 
-# PostgreSQL (production)
-kubectl exec -n kkbot postgresql-0 -- pg_dump -U kkbot kkbot > kkbot-backup-$(date +%Y%m%d).sql
+# Restore
+psql -h postgres -U kkbot kkbot < backup_20240115.sql
 ```
 
-### Restore
+### Plugin Backup
 
 ```bash
-# SQLite
-kubectl cp kkbot-backup.db kkbot/kkbot-pod:/app/data/kkbot.db
-
-# PostgreSQL
-kubectl exec -i -n kkbot postgresql-0 -- psql -U kkbot kkbot < kkbot-backup.sql
+tar -czf plugins_backup_$(date +%Y%m%d).tar.gz plugins/
 ```
 
----
+## Security
+
+### Network Policies
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kkbot-network-policy
+  namespace: kkbot
+spec:
+  podSelector:
+    matchLabels:
+      app: kkbot
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+```
+
+### Pod Security
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kkbot-api
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  containers:
+    - name: kkbot-api
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+```
 
 ## Troubleshooting
 
@@ -278,65 +355,47 @@ kubectl exec -i -n kkbot postgresql-0 -- psql -U kkbot kkbot < kkbot-backup.sql
 
 | Issue | Solution |
 |-------|----------|
-| ImagePullBackOff | Check GHCR credentials / image name |
-| CrashLoopBackOff | Check logs: `kubectl logs -n kkbot deployment/kkbot` |
-| Health check failing | Verify `/health` endpoint responds |
-| PVC pending | Check storage class availability |
-| Secrets not loaded | Verify secret exists and keys match |
+| Database connection failed | Check connection string, network policies, PostgreSQL status |
+| Redis connection failed | Verify Redis password, network connectivity |
+| Ollama not responding | Check GPU availability, Ollama service status |
+| Plugin not loading | Check DLL dependencies, plugin manifest validity |
+| High memory usage | Enable RAM cleaner, reduce FPS limits |
 
-### Debug Commands
+### Logs
 
 ```bash
-# View logs
-kubectl logs -n kkbot deployment/kkbot -f
+# View API logs
+kubectl logs -n kkbot deployment/kkbot-api -f
 
-# Exec into pod
-kubectl exec -n kkbot -it deployment/kkbot -- /bin/bash
-
-# Check events
-kubectl get events -n kkbot --sort-by='.lastTimestamp'
-
-# Describe resources
-kubectl describe pod -n kkbot -l app.kubernetes.io/name=kkbot
+# View Dashboard logs
+kubectl logs -n kkbot deployment/kkbot-dashboard -f
 ```
 
----
+### Debugging
 
-## Security Checklist
+Enable debug logging in appsettings.json:
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "KKBOT": "Debug"
+    }
+  }
+}
+```
 
-- [ ] Change default encryption passphrase and salt
-- [ ] Use strong PostgreSQL password
-- [ ] Enable TLS with valid certificates
-- [ ] Restrict network policies
-- [ ] Enable Pod Security Standards
-- [ ] Scan images for vulnerabilities regularly
-- [ ] Rotate secrets periodically
-- [ ] Audit RBAC permissions
-- [ ] Enable audit logging
+## Rollback Procedure
 
----
+```bash
+# Helm rollback
+helm rollback kkbot <revision> -n kkbot
 
-## Scaling Considerations
-
-### Horizontal Scaling
-- Increase `replicaCount` or enable HPA
-- Use Redis for session/cache sharing
-- Consider PostgreSQL read replicas
-
-### Vertical Scaling
-- Adjust `resources.limits` and `requests`
-- Monitor CPU/memory usage
-
-### Plugin Scaling
-- Mount plugins via ReadOnlyMany PVC
-- Consider separate plugin loader sidecar for large plugin sets
-
----
+# Database rollback (if migration applied)
+dotnet ef database update <previous_migration> --project src/KKBOT.Persistence.EfCore
+```
 
 ## Support
 
-For deployment issues:
-1. Check logs and events
-2. Review this guide
-3. Open GitHub issue with relevant logs
-4. Consult Kubernetes/Docker documentation
+- Documentation: https://docs.kkbot.example.com
+- Issues: https://github.com/your-org/kkbot/issues
+- Discussions: https://github.com/your-org/kkbot/discussions

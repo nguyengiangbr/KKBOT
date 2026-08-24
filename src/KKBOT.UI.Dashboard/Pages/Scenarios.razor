@@ -1,0 +1,168 @@
+@page "/scenarios"
+@page "/scenarios/{scenarioId}"
+@inject IScenarioService ScenarioService
+@inject NavigationManager Navigation
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+
+<PageTitle>Scenarios</PageTitle>
+
+<div class="scenarios-page">
+    <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">Scenarios</h1>
+            <p class="text-muted mb-0">Manage simulation scenarios for testing and development</p>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNewScenario" StartIcon="@Icons.Material.Filled.Add">
+            New Scenario
+        </MudButton>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <MudProgressCircular Indeterminate="true" Size="Size.Medium" />
+            <p class="mt-2 text-muted">Loading scenarios...</p>
+        </div>
+    }
+    else if (scenarios.Count == 0)
+    {
+        <div class="text-center py-5">
+            <MudIcon Icon="@Icons.Material.Filled.CodeOff" Size="Size.Large" Class="text-muted" />
+            <h4 class="mt-3">No scenarios found</h4>
+            <p class="text-muted">Create your first simulation scenario</p>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNewScenario" Class="mt-2">
+                Create Scenario
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@scenarios" Hover="true" Striped="true" Dense="true" Sortable="true" Filter="true"
+                  FilterPlaceholder="Search scenarios..." @bind-SortDirection="@sortDirection" @bind-SortLabel="@sortLabel">
+            <ToolBarContent>
+                <MudTextField @bind-Value="searchString" Placeholder="Search..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Class="w-100" />
+            </ToolBarContent>
+            <Columns>
+                <Column T="SimulationScenario" Field="@nameof(SimulationScenario.Name)" Title="Name" Sortable="true" />
+                <Column T="SimulationScenario" Field="@nameof(SimulationScenario.Description)" Title="Description" Sortable="true" />
+                <Column T="SimulationScenario" Field="@nameof(SimulationScenario.Version)" Title="Version" Sortable="true" />
+                <Column T="SimulationScenario" Field="@nameof(SimulationScenario.Steps)" Title="Steps" Sortable="true">
+                    <CellTemplate>
+                        <span class="badge bg-info">@context.Steps.Count</span>
+                    </CellTemplate>
+                </Column>
+                <Column T="SimulationScenario" Field="@nameof(SimulationScenario.UpdatedAt)" Title="Updated" Sortable="true">
+                    <CellTemplate>
+                        <span class="text-muted small">@context.UpdatedAt.ToLocalTime().ToString("g")</span>
+                    </CellTemplate>
+                </Column>
+                <Column T="SimulationScenario" Title="Actions">
+                    <CellTemplate>
+                        <div class="btn-group btn-group-sm">
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => EditScenario(context.Id))" 
+                                      Icon="@Icons.Material.Filled.Edit" Title="Edit" />
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => RunScenario(context.Id))" 
+                                      Icon="@Icons.Material.Filled.PlayArrow" Title="Run" Color="Color.Success" />
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => CloneScenario(context.Id))" 
+                                      Icon="@Icons.Material.Filled.ContentCopy" Title="Clone" />
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => DeleteScenario(context.Id))" 
+                                      Icon="@Icons.Material.Filled.Delete" Title="Delete" Color="Color.Error" />
+                        </div>
+                    </CellTemplate>
+                </Column>
+            </Columns>
+        </MudTable>
+    }
+</div>
+
+@code {
+    private List<SimulationScenario> scenarios = new();
+    private bool isLoading = true;
+    private string searchString = "";
+    private SortDirection sortDirection = SortDirection.Descending;
+    private string sortLabel = "UpdatedAt";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadScenarios();
+    }
+
+    private async Task LoadScenarios()
+    {
+        isLoading = true;
+        try
+        {
+            var list = await ScenarioService.GetAllAsync();
+            scenarios = list.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load scenarios: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void CreateNewScenario()
+    {
+        Navigation.NavigateTo("/scenarios/editor");
+    }
+
+    private void EditScenario(string id)
+    {
+        Navigation.NavigateTo($"/scenarios/editor/{id}");
+    }
+
+    private async Task RunScenario(string id)
+    {
+        var scenario = await ScenarioService.GetAsync(id);
+        if (scenario != null)
+        {
+            // Navigate to editor with run parameter
+            Navigation.NavigateTo($"/scenarios/editor/{id}?run=true");
+        }
+    }
+
+    private async Task CloneScenario(string id)
+    {
+        var scenario = await ScenarioService.GetAsync(id);
+        if (scenario != null)
+        {
+            var cloned = scenario with 
+            { 
+                Id = Guid.NewGuid().ToString("N"),
+                Name = $"{scenario.Name} (Copy)",
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            
+            await ScenarioService.SaveAsync(cloned);
+            Snackbar.Add("Scenario cloned successfully", Severity.Success);
+            await LoadScenarios();
+        }
+    }
+
+    private async Task DeleteScenario(string id)
+    {
+        var confirmed = await Dialog.ShowMessageBox("Delete Scenario", 
+            "Are you sure you want to delete this scenario? This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        
+        if (confirmed == true)
+        {
+            var result = await ScenarioService.DeleteAsync(id);
+            if (result)
+            {
+                Snackbar.Add("Scenario deleted", Severity.Success);
+                await LoadScenarios();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete scenario", Severity.Error);
+            }
+        }
+    }
+}

@@ -11,20 +11,28 @@
 
 ## 🎯 Features
 
-- **🔌 Plugin Architecture** - Hot-loadable game modules with isolated AssemblyLoadContext
-- **👁️ Computer Vision** - OpenCV-based template matching, OCR pipeline
-- **🤖 AI Integration** - Ollama LLM client with vision support, streaming responses
-- **🎮 Device Abstraction** - ADB for Android, simulator for testing
-- **📊 Orchestration** - DAG scheduler, dynamic FSM from plugin states, event sourcing
-- **💾 Persistence** - EF Core with SQLite/PostgreSQL, repository pattern
-- **🔐 Security** - Secret management (Vault-ready), AES encryption, audit logging
-- **📈 Observability** - Serilog, health checks, Prometheus metrics, Grafana dashboards
-- **🖥️ Modern Dashboard** - Blazor Server + MudBlazor, real-time monitoring
-- **🤝 Real-time Collaboration** - Multi-user instance control, presence, recordings
-- **🤖 AI/ML Pipeline** - Model registry, training, inference, feature store, monitoring
-- **⚡ GPU/Edge Optimization** - TensorRT, ONNX quantization, edge deployment
-- **🔐 Enterprise Security** - SSO, audit, GDPR/SOC2, advanced RBAC, data governance
-- **☸️ Cloud Native** - Docker, Helm chart, GitHub Actions CI/CD, Kubernetes ready
+### Core Platform
+- **🔌 Plugin Architecture** - Hot-loadable game modules with isolated AssemblyLoadContext + WASM (Wasmtime) sandbox
+- **👁️ Computer Vision** - OpenCV-based template matching, OCR pipeline, perception pipeline
+- **🤖 AI Integration** - Ollama LLM client with vision support, streaming responses, AI Pipeline (training/inference)
+- **🎮 Device Abstraction** - ADB for Android, Simulator with Scenario DSL v2 for testing
+- **📊 Orchestration** - DAG Scheduler, FSM from plugin states, Event Sourcing, Saga pattern, Recovery Coordinator
+- **💾 Persistence** - EF Core with SQLite/PostgreSQL, Repository pattern, EventStore with snapshots/projections
+- **🔐 Security** - JWT/RBAC, AES-256 encryption, Audit logging, Capability-based WASM sandbox
+- **📈 Observability** - OpenTelemetry (Jaeger/OTLP), Serilog, Prometheus metrics, AlertManager, Health checks
+- **🖥️ Modern Dashboard** - Blazor Server + MudBlazor, Real-time monitoring, Visual Scripting Editor
+- **🤝 Collaboration** - Multi-user instance control, Presence, Recordings, Screen sharing
+- **🤖 Multi-Agent Coordination** - Agent Registry, MessageBus, Consensus, Leader Election, Distributed Locks
+- **🧠 GameAgent Framework** - LLM-powered agents with planning, tool use, memory, learning
+
+### Game-Specific Modules
+- **🔑 Module 1: Account & Auto-Login** - Auto login/relogin, Server/Channel/Character selection, Security screens (PIN/OTP/Captcha), Crash recovery
+- **🛡️ Module 7: Anti-Detection & Alerts** - Humanizer (delays, jitter, Bezier curves), Telegram Bot alerts, Remote control
+- **⚡ Module 3: Resource Optimizer** - FPS Limiter (5-10 background), Render Stripping, RAM Cleaner, Window Grid Layout
+- **🌐 Module 2: Network & Proxy** (planned) - Per-instance proxy binding, Isolation, Auto-rotation
+- **🏥 Module 4: Logistics & Survival** (planned) - Auto Heal/Buff, Auto Refill/Repair, Smart Inventory
+- **⚔️ Module 5: Combat & Quest** (planned) - Skill Combo Engine, Anti-KS, Auto Quest, Party Controller
+- **💰 Module 6: Economy & Trading** (planned) - Auto Vending, Master Accumulator
 
 ## 🏗️ Architecture
 
@@ -34,7 +42,7 @@
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
 │  │  API     │  │ Dashboard│  │  CLI     │  │  Plugins │        │
-│  │  Layer   │  │  (Blazor)│  │  Tool    │  │  Loader  │        │
+│  │  Layer   │  │ (Blazor) │  │  Tool    │  │  Loader  │        │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘        │
 │       │             │             │             │               │
 │       └─────────────┼─────────────┼─────────────┘               │
@@ -62,291 +70,105 @@
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │              Persistence (EF Core) + Security             │  │
 │  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- .NET 10 SDK
+- Docker 24+ (for containerized deployment)
+- Redis 7+
+- Ollama (for AI features)
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Docker](https://www.docker.com/) (optional, for containerized deployment)
-- [Ollama](https://ollama.ai/) (optional, for AI features)
-
-### Development Setup
-
+### Local Development
 ```bash
-# Clone repository
+# Clone
 git clone https://github.com/your-org/kkbot.git
 cd kkbot
 
-# Restore dependencies
+# Restore & Build
 dotnet restore
-
-# Build solution
 dotnet build
 
-# Run tests
-dotnet test
-
-# Start dashboard (Blazor Server)
-dotnet run --project src/KKBOT.UI.Dashboard
-
-# Start API
+# Run API
 dotnet run --project src/KKBOT.API
+
+# Run Dashboard (separate terminal)
+dotnet run --project src/KKBOT.UI.Dashboard
 ```
 
-### Docker Development
-
+### Docker Deployment
 ```bash
-# Start with hot reload
+# Development
 docker-compose up -d
 
-# View logs
-docker-compose logs -f kkbot
+# Production with monitoring
+docker-compose --profile postgres --profile redis --profile monitoring up -d
 ```
 
-### Production Deployment
-
+### Kubernetes (Helm)
 ```bash
-# Set required secrets
-export ENCRYPTION_PASSPHRASE="your-secure-passphrase"
-export ENCRYPTION_SALT="your-secure-salt"
-export POSTGRES_PASSWORD="secure-db-password"
-
-# Deploy with Docker Compose
-docker-compose --profile postgres --profile redis up -d
-
-# Or deploy to Kubernetes
-helm install kkbot ./helm/kkbot -f values-prod.yaml -n kkbot --create-namespace
+helm install kkbot ./helm/kkbot -n kkbot --create-namespace -f values-prod.yaml
 ```
 
-## 📚 Documentation
+## 📁 Project Structure
+
+```
+src/
+├── KKBOT.API/                    # REST API + SignalR hubs
+├── KKBOT.UI.Dashboard/           # Blazor Server Dashboard
+├── KKBOT.Domain/                 # Domain models & entities
+├── KKBOT.Application/            # Commands, Queries, Handlers
+├── KKBOT.Orchestration/          # Scheduler, FSM, Saga, EventStore
+├── KKBOT.Device.*/               # ADB, Simulator, DSL v2
+├── KKBOT.Perception.*/           # OpenCV, OCR, Pipeline
+├── KKBOT.AI.*/                   # Ollama, AI Pipeline
+├── KKBOT.Plugins.*/              # Plugin system, WASM sandbox
+├── KKBOT.Agent.*/                # GameAgent, Coordination
+├── KKBOT.Plugin.AccountLogin/    # Module 1: Auto-Login
+├── KKBOT.Plugin.AntiDetection/   # Module 7: Anti-Detection
+├── KKBOT.Plugin.ResourceOptimizer/ # Module 3: Resource Optimizer
+└── tests/                        # Integration & Unit tests
+```
+
+## 📖 Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Architecture Overview](docs/architecture.md) | System design and component interactions |
-| [API Reference](docs/api-reference.md) | Complete REST API documentation |
-| [Plugin Development](docs/plugin-development.md) | Guide to creating game modules |
-| [Deployment Guide](DEPLOYMENT.md) | Docker, Kubernetes, CI/CD instructions |
-| [Configuration](docs/configuration.md) | All configuration options |
-| [Security](docs/security.md) | Secret management, encryption, audit |
-| [Monitoring](docs/monitoring.md) | Metrics, logging, alerting setup |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
+| [Architecture](docs/ARCHITECTURE.md) | System architecture & design decisions |
+| [Deployment](docs/DEPLOYMENT.md) | Docker, Kubernetes, Local deployment |
+| [Configuration](docs/configuration.md) | Configuration reference |
+| [Plugin Development](docs/plugin-development.md) | Creating game plugins |
+| [GameAgent Framework](docs/GAME_AGENT_FRAMEWORK_SPEC.md) | AI Agent specification |
+| [Multi-Agent Coordination](docs/MULTI_AGENT_COORDINATION_FRAMEWORK.md) | Agent coordination system |
+| [GameAgent Spec](docs/GAME_AGENT_FRAMEWORK_SPEC.md) | AI Agent technical spec |
+| [API Reference](docs/api-reference.md) | REST API documentation |
 
-## 🔌 Creating a Plugin
+## 🔧 Configuration
 
-### 1. Create a Class Library
-
-```bash
-dotnet new classlib -n MyGamePlugin
-cd MyGamePlugin
-dotnet add reference ../src/KKBOT.Plugins.Abstractions/KKBOT.Plugins.Abstractions.csproj
-dotnet add reference ../src/KKBOT.Perception.Abstractions/KKBOT.Perception.Abstractions.csproj
-```
-
-### 2. Implement IGameModule
-
-```csharp
-public sealed class MyGameModule : IGameModule
+Key settings in `appsettings.json`:
+```json
 {
-    public string Id => "my-game";
-    public string Version => "1.0.0";
-
-    public ModuleManifest GetManifest() => new()
-    {
-        Id = Id,
-        Name = "My Game Bot",
-        Version = Version,
-        Author = "Your Name",
-        Description = "Automation for My Game",
-        SupportedResolutions = [new Resolution(1920, 1080)],
-        RequiredPermissions = ["DEVICE_READ", "INPUT_WRITE"],
-        Assets = ["templates/health_bar.png"]
-    };
-
-    public IReadOnlyCollection<IGameDetector> GetDetectors() => 
-        [new HealthBarDetector(), new ManaBarDetector()];
-
-    public IReadOnlyCollection<IGameTaskDefinition> GetTasks() => 
-        [new AutoAttackTask(), new HealTask()];
-
-    public IReadOnlyCollection<IStateDefinition> GetStates() => 
-        [new IdleState(), new CombatState(), new HealingState()];
-
-    public async Task<ModuleValidationResult> ValidateAsync(ModuleContext ctx, CancellationToken ct)
-    {
-        // Validate assets, config, permissions
-        return new ModuleValidationResult(true, []);
-    }
+  "ConnectionStrings": { "KkbotDb": "DataSource=kkbot.db" },
+  "Security": { "EncryptionPassphrase": "change-me", "EncryptionSalt": "change-me" },
+  "OpenTelemetry": { "EnableJaeger": true, "EnablePrometheus": true },
+  "AI": { "Ollama": { "BaseUrl": "http://localhost:11434", "Model": "llama3.1:8b" } },
+  "Plugins": { "Path": "plugins", "AutoReload": true }
 }
 ```
 
-### 3. Build and Deploy
-
-```bash
-dotnet build -c Release
-# Copy output DLL to plugins/ directory
-```
-
-See [Plugin Development Guide](docs/plugin-development.md) for complete details.
-
-## 📦 Project Structure
-
-```
-KKBOT/
-├── src/
-│   ├── KKBOT.Domain              # Domain models, enums, events
-│   ├── KKBOT.Application         # MediatR commands/queries, validators
-│   ├── KKBOT.Contracts           # Shared DTOs, interfaces
-│   ├── KKBOT.Device.Abstractions # Device interfaces
-│   ├── KKBOT.Device.Adb          # ADB implementation
-│   ├── KKBOT.Device.Simulator    # Simulator for testing
-│   ├── KKBOT.Perception.Abstractions # Perception interfaces
-│   ├── KKBOT.Perception.OpenCv   # OpenCV implementation
-│   ├── KKBOT.Perception.Ocr      # OCR engine
-│   ├── KKBOT.AI.Abstractions     # AI service interfaces
-│   ├── KKBOT.AI.Ollama           # Ollama implementation
-│   ├── KKBOT.AI.Pipeline         # AI/ML Pipeline
-│   ├── KKBOT.Plugins.Abstractions # Plugin contracts
-│   ├── KKBOT.Plugins.Loader      # Plugin loading (AssemblyLoadContext)
-│   ├── KKBOT.Plugin.Sample       # Sample plugin
-│   ├── KKBOT.Plugin.SampleGame   # Complete sample game plugin
-│   ├── KKBOT.Plugins.Loader      # Plugin loading (AssemblyLoadContext)
-│   ├── KKBOT.Plugins.Marketplace # Plugin marketplace backend
-│   ├── KKBOT.Orchestration       # Scheduler, FSM, EventStore
-│   ├── KKBOT.Persistence.Abstractions # Repository interfaces
-│   ├── KKBOT.Persistence.EfCore  # EF Core implementation
-│   ├── KKBOT.Security.Abstractions # Security interfaces
-│   ├── KKBOT.Security            # Security implementations
-│   ├── KKBOT.Observability       # Telemetry, health checks
-│   ├── KKBOT.API                 # REST API (Swagger/OpenAPI)
-│   ├── KKBOT.UI.Dashboard        # Blazor Server dashboard
-│   ├── KKBOT.AI.Pipeline         # AI/ML Pipeline
-│   ├── KKBOT.AI.Optimization     # GPU/Edge Optimization
-│   ├── KKBOT.Analytics           # Advanced Analytics & BI
-│   ├── KKBOT.Collaboration       # Real-time Collaboration
-│   ├── KKBOT.Enterprise          # Enterprise Features
-│   ├── KKBOT.AI.Optimization     # GPU/Edge Optimization
-│   ├── KKBOT.Collaboration       # Real-time Collaboration
-│   ├── KKBOT.AI.Pipeline         # AI/ML Pipeline
-│   ├── KKBOT.Observability       # Telemetry, health checks
-│   ├── KKBOT.Security.Abstractions # Security interfaces
-│   ├── KKBOT.Security            # Security implementations
-│   ├── KKBOT.Plugins.Marketplace # Plugin marketplace backend
-│   ├── KKBOT.Plugin.Sample       # Sample plugin
-│   ├── KKBOT.Plugin.SampleGame   # Complete sample game plugin
-│   ├── KKBOT.Orchestration       # Scheduler, FSM, EventStore
-│   ├── KKBOT.Persistence.Abstractions # Repository interfaces
-│   ├── KKBOT.Persistence.EfCore  # EF Core implementation
-│   ├── KKBOT.Security.Abstractions # Security interfaces
-│   ├── KKBOT.Security            # Security implementations
-│   ├── KKBOT.Observability       # Telemetry, health checks
-│   ├── KKBOT.API                 # REST API (Swagger/OpenAPI)
-│   └── KKBOT.UI.Dashboard        # Blazor Server dashboard
-├── samples/
-│   └── KKBOT.Plugin.SampleGame   # Complete sample game plugin
-├── tests/                        # Unit & integration tests
-├── helm/kkbot/                   # Helm chart for Kubernetes
-├── monitoring/                   # Prometheus/Grafana configs
-├── docs/                         # Documentation
-├── mobile/                       # React Native mobile app
-├── docs/                         # Documentation
-├── Dockerfile
-├── docker-compose.yml
-├── docker-compose.override.yml
-├── .github/workflows/ci.yml      # CI/CD pipeline
-└── README.md
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-dotnet test
-
-# Run with coverage
-dotnet test --collect:"XPlat Code Coverage"
-
-# Run specific test project
-dotnet test tests/KKBOT.Perception.Tests
-dotnet test tests/KKBOT.Plugin.Loader.Tests
-dotnet test tests/KKBOT.Orchestration.Tests
-dotnet test tests/KKBOT.Persistence.Tests
-dotnet test tests/KKBOT.Security.Tests
-dotnet test tests/KKBOT.AI.Pipeline.Tests
-dotnet test tests/KKBOT.Plugin.Marketplace.Tests
-dotnet test tests/KKBOT.Orchestration.Tests
-dotnet test tests/KKBOT.Orchestration.Advanced.Tests
-dotnet test tests/KKBOT.Persistence.Tests
-dotnet test tests/KKBOT.Security.Tests
-dotnet test tests/KKBOT.Plugin.Marketplace.Tests
-dotnet test tests/KKBOT.Identity.Tests
-dotnet test tests/KKBOT.AI.Pipeline.Tests
-dotnet test tests/KKBOT.Collaboration.Tests
-dotnet test tests/KKBOT.Marketplace.Server.Tests
-dotnet test tests/KKBOT.VisualScripting.Tests
-dotnet test tests/KKBOT.Plugin.Marketplace.Tests
-dotnet test tests/KKBOT.Identity.Tests
-dotnet test tests/KKBOT.AI.Pipeline.Tests
-dotnet test tests/KKBOT.Collaboration.Tests
-dotnet test tests/KKBOT.Marketplace.Server.Tests
-dotnet test tests/KKBOT.AI.Optimization.Tests
-```
-
-## 📊 Monitoring
-
-### Health Checks
-- `GET /health` - Liveness/readiness probe
-
-### Metrics (Prometheus)
-- `GET /metrics` - Application metrics
-
-### Key Metrics
-| Metric | Description |
-|--------|-------------|
-| `kkbot_instances_total` | Total instances |
-| `kkbot_instances_status` | Instances by status |
-| `kkbot_jobs_total` | Total jobs |
-| `kkbot_jobs_status` | Jobs by status |
-| `kkbot_job_duration_seconds` | Job execution time |
-| `kkbot_plugin_count` | Loaded plugins |
-
-### Grafana Dashboards
-Import dashboards from `monitoring/grafana/dashboards/`
-
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow [.NET coding conventions](https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions)
-- Write unit tests for new features
-- Update documentation for API changes
-- Ensure all tests pass before submitting PR
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📄 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
-- [OpenCvSharp4](https://github.com/shimat/OpenCvSharp) - OpenCV bindings for .NET
-- [MudBlazor](https://mudblazor.com/) - Blazor component library
-- [Serilog](https://serilog.net/) - Structured logging
-- [MediatR](https://github.com/jbogard/MediatR) - Mediator pattern
-- [FluentValidation](https://fluentvalidation.net/) - Validation library
-- [Polly](https://github.com/App-vNext/Polly) - Resilience patterns
 
-## 📞 Support
-- **Issues**: [GitHub Issues](https://github.com/your-org/kkbot/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/kkbot/discussions)
-- **Email**: support@kkbot.example.com
+- OpenCV, Wasmtime, Semantic Kernel, MudBlazor, and all open-source dependencies.
 
 ---
 
-<div align="center">
-  <strong>Made with ❤️ by the KKBOT Team</strong>
-</div>
+**Status**: Production-ready infrastructure with 3/7 game-specific modules implemented. See [CURRENT_STATE.md](CURRENT_STATE.md) for details.

@@ -1,0 +1,133 @@
+name: Code Signing
+
+on:
+  workflow_call:
+    inputs:
+      artifacts-path:
+        required: true
+        type: string
+      configuration:
+        required: false
+        type: string
+        default: 'Release'
+    secrets:
+      SIGNING_CERTIFICATE:
+        required: true
+      SIGNING_PASSWORD:
+        required: true
+      TIMESTAMP_SERVER:
+        required: false
+        default: 'http://timestamp.digicert.com'
+
+jobs:
+  sign:
+    name: Sign Artifacts
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ inputs.artifacts-path }}
+
+      - name: Install signing tools
+        run: |
+          choco install -y windows-sdk-10.1
+          # signtool is included in Windows SDK
+
+      - name: Import certificate
+        run: |
+          $certBytes = [Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
+          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($certBytes, "${{ secrets.SIGNING_PASSWORD }}", [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::MachineKeySet)
+          $store = New-Object System.Security.Cryptography.X509Certificates.X509Store([System.Security.Cryptography.X509Certificates.StoreName]::My, [System.Security.Cryptography.X509Certificates.StoreLocation]::LocalMachine)
+          $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+          $store.Add($cert)
+          $store.Close()
+        shell: pwsh
+
+      - name: Sign .NET assemblies
+        run: |
+          $signTool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+          if (-not (Test-Path $signTool)) {
+            $signTool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          }
+          
+          $files = Get-ChildItem "${{ inputs.artifacts-path }}" -Recurse -Include *.dll, *.exe | Where-Object { $_.Name -notmatch '^(Test|Benchmark|Analyzers)' }
+          
+          foreach ($file in $files) {
+            Write-Host "Signing $($file.FullName)"
+            & $signTool sign /fd SHA256 /tr "${{ secrets.TIMESTAMP_SERVER }}" /td SHA256 /a /v $file.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to sign $($file.FullName)"
+              exit 1
+            }
+          }
+        shell: pwsh
+
+      - name: Verify signatures
+        run: |
+          $signTool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+          if (-not (Test-Path $signTool)) {
+            $signTool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          }
+          
+          $files = Get-ChildItem "${{ inputs.artifacts-path }}" -Recurse -Include *.dll, *.exe | Where-Object { $_.Name -notmatch '^(Test|Benchmark|Analyzers)' }
+          
+          foreach ($file in $files) {
+            Write-Host "Verifying $($file.FullName)"
+            & $signTool verify /pa /v $file.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Verification failed for $($file.FullName)"
+              exit 1
+            }
+          }
+        shell: pwsh
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-artifacts
+          path: ${{ inputs.artifacts-path }}
+          retention-days: 30
+
+  sign-installer:
+    name: Sign Installer
+    runs-on: windows-latest
+    timeout-minutes: 15
+    needs: sign
+    steps:
+      - name: Download signed artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-artifacts
+          path: ${{ inputs.artifacts-path }}
+
+      - name: Sign installer
+        if: always()
+        run: |
+          $installer = Get-ChildItem "${{ inputs.artifacts-path }}" -Recurse -Include *.exe, *.msi | Where-Object { $_.Name -match 'Setup|Installer' } | Select-Object -First 1
+          if ($installer) {
+            Write-Host "Signing installer: $($installer.FullName)"
+            $signTool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe"
+            if (-not (Test-Path $signTool)) {
+              $signTool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            }
+            & $signTool sign /fd SHA256 /tr "${{ secrets.TIMESTAMP_SERVER }}" /td SHA256 /a /v $installer.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to sign installer"
+              exit 1
+            }
+          } else {
+            Write-Warning "No installer found to sign"
+          }
+        shell: pwsh
+
+      - name: Upload final artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-signed-artifacts
+          path: ${{ inputs.artifacts-path }}
+          retention-days: 90

@@ -50,20 +50,20 @@ dotnet add reference ../src/KKBOT.AI.Abstractions/KKBOT.AI.Abstractions.csproj
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AssemblyName>KKBOT.Plugin.MyGame</AssemblyName>
-    <RootNamespace>KKBOT.Plugin.MyGame</RootNamespace>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <TargetFramework>net10.0
+    <Nullable>enable
+    <ImplicitUsings>enable
+    <GenerateDocumentationFile>true
+    <AssemblyName>KKBOT.Plugin.MyGame
+    <RootNamespace>KKBOT.Plugin.MyGame
+    <CopyLocalLockFileAssemblies>true
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="..\..\src\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="....srcKKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="....srcKKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="....srcKKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="....srcKKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
   </ItemGroup>
 
   <!-- Auto-copy to plugins folder on build -->
@@ -113,22 +113,36 @@ public sealed class MyGameModule : IGameModule
             Description = "Automation for My Game",
             SupportedResolutions = [new Resolution(1920, 1080)],
             RequiredPermissions = ["DEVICE_READ", "INPUT_WRITE", "SCREENSHOT_CAPTURE"],
-            ConfigSchema = """{ "type": "object", "properties": { "autoAttack": { "type": "boolean", "default": true } } }""",
-            DefaultConfig = """{ "autoAttack": true }""",
+            ConfigSchema = "{ "type": "object" }",
+            DefaultConfig = "{}",
             EntryAssembly = "KKBOT.Plugin.MyGame.dll",
-            Assets = ["templates/health.png", "templates/mana.png"]
+            Assets = ["assets/my_template.png", "assets/health_bar.png"]
         };
     }
 
-    public IReadOnlyCollection<IGameDetector> GetDetectors() => [/* detectors */];
-    public IReadOnlyCollection<IGameTaskDefinition> GetTasks() => [/* tasks */];
-    public IReadOnlyCollection<IStateDefinition> GetStates() => [/* states */];
+    public IReadOnlyCollection<IGameDetector> GetDetectors()
+    {
+        return [new HealthBarDetector(), new ManaBarDetector()];
+    }
+
+    public IReadOnlyCollection<IGameTaskDefinition> GetTasks()
+    {
+        return [new AutoAttackTask(), new AutoHealTask()];
+    }
+
+    public IReadOnlyCollection<IStateDefinition> GetStates()
+    {
+        var idle = new SimpleStateDefinition("idle", "Idle", "idle", 
+            ctx => true, null, ["combat"], TimeSpan.FromSeconds(30), new(), new());
+        var combat = new SimpleStateDefinition("combat", "Combat", "action",
+            ctx => true, new AttackAction(), ["idle"], TimeSpan.FromMinutes(5), new(), new());
+        return [idle, combat];
+    }
 
     public async Task<ModuleValidationResult> ValidateAsync(ModuleContext context, CancellationToken ct)
     {
-        var errors = new List<ModuleValidationError>();
-        // Validate assets, config, etc.
-        return new ModuleValidationResult(errors.Count == 0, errors);
+        // Validate templates exist, config is valid, etc.
+        return new ModuleValidationResult(true, []);
     }
 }
 ```
@@ -137,127 +151,58 @@ public sealed class MyGameModule : IGameModule
 
 ## Creating Detectors
 
-Detectors analyze game frames and return structured results.
+Detectors identify game states from screen captures.
 
-### Interface
-
-```csharp
-public interface IGameDetector
-{
-    string Id { get; }
-    string Name { get; }
-    DetectorType Type { get; }
-    double RequiredConfidence { get; }
-    Task<DetectorResult> DetectAsync(Frame frame, CancellationToken cancellationToken);
-}
-```
-
-### Template Matching Detector (OpenCV)
+### Simple Template Detector
 
 ```csharp
 public sealed class HealthBarDetector : IGameDetector
 {
     public string Id => "health_bar";
-    public string Name => "Health Bar Detector";
-    public DetectorType Type => DetectorType.TemplateMatch;
-    public double RequiredConfidence => 0.85;
+    public string Name => "Health Bar";
 
-    public async Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct)
+    public async Task<DetectionResult> DetectAsync(PerceptionContext context, CancellationToken ct)
     {
-        // Use OpenCV to match template
-        // This is simplified - real implementation uses OpenCvSharp
+        // Use OpenCV template matching
+        var result = await TemplateMatcher.MatchAsync(
+            context.Frame, 
+            "assets/health_bar.png",
+            threshold: 0.85);
         
-        var result = new DetectorResult
+        return new DetectionResult
         {
             DetectorId = Id,
-            DetectorName = Name,
-            Confidence = 0.92,
-            IsMatch = true,
-            DetectedValue = "HP: 78%",
-            BoundingBox = new Rectangle(50, 50, 200, 30),
-            Timestamp = DateTime.UtcNow,
-            RawScore = 0.92
+            IsMatch = result.IsMatch,
+            Confidence = result.Confidence,
+            Location = result.Location
         };
-        return result;
     }
 }
 ```
 
-### Color Analysis Detector
+### Advanced Detector with OCR
 
 ```csharp
-public sealed class ManaBarDetector : IGameDetector
+public sealed class PlayerNameDetector : IGameDetector
 {
-    public string Id => "mana_bar";
-    public string Name => "Mana Bar Detector";
-    public DetectorType Type => DetectorType.ColorAnalysis;
-    public double RequiredConfidence => 0.80;
+    public string Id => "player_name";
+    public string Name => "Player Name OCR";
 
-    public async Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct)
+    public async Task<DetectionResult> DetectAsync(PerceptionContext context, CancellationToken ct)
     {
-        // Analyze pixel colors in mana bar region
-        var manaPercent = AnalyzeManaColor(frame);
+        var ocrResult = await OcrEngine.RecognizeAsync(
+            context.Frame.Data,
+            region: new Rectangle(100, 50, 300, 50),
+            language: "eng");
         
-        return new DetectorResult
+        return new DetectionResult
         {
             DetectorId = Id,
-            DetectorName = Name,
-            Confidence = 0.88,
-            IsMatch = manaPercent > 0,
-            DetectedValue = $"MP: {manaPercent}%",
-            BoundingBox = new Rectangle(50, 90, 200, 20),
-            Timestamp = DateTime.UtcNow
-        };
-    }
-
-    private int AnalyzeManaColor(Frame frame)
-    {
-        // Implementation: decode frame, sample pixels, calculate blue ratio
-        return 65; // Example
-    }
-}
-```
-
-### OCR Detector
-
-```csharp
-public sealed class GoldDetector : IGameDetector
-{
-    public string Id => "gold_amount";
-    public string Name => "Gold Amount OCR";
-    public DetectorType Type => DetectorType.Ocr;
-    public double RequiredConfidence => 0.70;
-
-    private readonly IOcrEngine _ocrEngine;
-
-    public GoldDetector(IOcrEngine ocrEngine)
-    {
-        _ocrEngine = ocrEngine;
-    }
-
-    public async Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct)
-    {
-        // Crop gold region
-        var goldRegion = CropRegion(frame, new Rectangle(1700, 20, 150, 40));
-        
-        var ocrResult = await _ocrEngine.RecognizeAsync(goldRegion, ct);
-        var goldAmount = ParseGold(ocrResult.Text);
-        
-        return new DetectorResult
-        {
-            DetectorId = Id,
-            DetectorName = Name,
+            IsMatch = !string.IsNullOrEmpty(ocrResult.Text),
             Confidence = ocrResult.Confidence,
-            IsMatch = ocrResult.Confidence >= RequiredConfidence,
-            DetectedValue = $"Gold: {goldAmount:N0}",
-            BoundingBox = new Rectangle(1700, 20, 150, 40),
-            Timestamp = DateTime.UtcNow
+            DetectedValue = ocrResult.Text
         };
     }
-
-    private long ParseGold(string text) => long.TryParse(text.Replace(",", ""), out var g) ? g : 0;
-    
-    private byte[] CropRegion(Frame frame, Rectangle rect) => frame.Data; // Simplified
 }
 ```
 
@@ -265,95 +210,41 @@ public sealed class GoldDetector : IGameDetector
 
 ## Creating Tasks
 
-Tasks are discrete units of work that can be scheduled and executed.
+Tasks define executable game actions.
 
-### Interface
-
-```csharp
-public interface IGameTaskDefinition
-{
-    string Id { get; }
-    string Name { get; }
-    string? Description { get; }
-    TaskType Type { get; }           // OneShot, Repeating, Manual
-    TimeSpan DefaultTimeout { get; }
-    RetryPolicy DefaultRetryPolicy { get; }
-    bool RequiresApproval { get; }
-    Task<IStateDefinition> ExecuteAsync(TaskContext context, CancellationToken cancellationToken);
-}
-```
-
-### One-Shot Task
+### Simple Task
 
 ```csharp
-public sealed class UseHealthPotionTask : IGameTaskDefinition
+public sealed class AutoHealTask : IGameTaskDefinition
 {
-    public string Id => "use_health_potion";
-    public string Name => "Use Health Potion";
-    public string? Description => "Consumes a health potion from inventory";
-    public TaskType Type => TaskType.OneShot;
-    public TimeSpan DefaultTimeout => TimeSpan.FromSeconds(5);
-    public RetryPolicy DefaultRetryPolicy => new(1, 200, false);
-    public bool RequiresApproval => false;
-
-    public async Task<IStateDefinition> ExecuteAsync(TaskContext context, CancellationToken ct)
-    {
-        // 1. Get device session from context
-        // 2. Send input to use potion (key press, click, etc.)
-        // 3. Wait for animation
-        // 4. Return next state
-        
-        await Task.Delay(500, ct); // Simulate potion use delay
-        
-        // Return the state to transition to
-        return new CombatState(); // Stay in combat after healing
-    }
-}
-```
-
-### Repeating Task
-
-```csharp
-public sealed class AutoAttackTask : IGameTaskDefinition
-{
-    public string Id => "auto_attack";
-    public string Name => "Auto Attack";
-    public string? Description => "Continuously uses basic attack skill";
+    public string Id => "auto_heal";
+    public string Name => "Auto Heal";
+    public string? Description => "Automatically heal when HP is low";
     public TaskType Type => TaskType.Repeating;
-    public TimeSpan DefaultTimeout => TimeSpan.FromMinutes(10);
-    public RetryPolicy DefaultRetryPolicy => new(3, 1000, true);
+    public TimeSpan DefaultTimeout => TimeSpan.FromSeconds(30);
+    public RetryPolicy DefaultRetryPolicy => new(3, 5000);
     public bool RequiresApproval => false;
 
     public async Task<IStateDefinition> ExecuteAsync(TaskContext context, CancellationToken ct)
     {
-        // Check if in combat, use skill if off cooldown
-        await Task.Delay(200, ct); // Attack interval
+        var device = context.GetDeviceSession();
+        var perception = context.GetPerceptionPipeline();
         
-        return new CombatState(); // Continue combat
-    }
-}
-```
-
-### Manual Task (Requires Approval)
-
-```csharp
-public sealed class PurchaseItemTask : IGameTaskDefinition
-{
-    public string Id => "purchase_item";
-    public string Name => "Purchase Item from Shop";
-    public string? Description => "Buys specified item from NPC shop (requires user approval)";
-    public TaskType Type => TaskType.Manual;
-    public TimeSpan DefaultTimeout => TimeSpan.FromMinutes(2);
-    public RetryPolicy DefaultRetryPolicy => new(2, 2000, true);
-    public bool RequiresApproval => true; // User must approve spending
-
-    public async Task<IStateDefinition> ExecuteAsync(TaskContext context, CancellationToken ct)
-    {
-        var itemId = context.Parameters.GetValueOrDefault("itemId")?.ToString() ?? "";
-        var quantity = int.Parse(context.Parameters.GetValueOrDefault("quantity")?.ToString() ?? "1");
+        // Check HP
+        var frame = await device.CaptureAsync(new CaptureOptions(), ct);
+        var hpResult = await _hpDetector.DetectAsync(new PerceptionContext(frame), ct);
         
-        // Navigate to shop, buy item
-        await Task.Delay(1000, ct);
+        if (hpResult.IsMatch && hpResult.Confidence < 0.3) // Low HP
+        {
+            // Use health potion (key '1')
+            await device.SendInputAsync(new InputCommand
+            {
+                Type = InputType.Key,
+                KeyCode = 0x31 // '1' key
+            }, ct);
+            
+            await Task.Delay(1000, ct);
+        }
         
         return new IdleState();
     }
@@ -364,100 +255,38 @@ public sealed class PurchaseItemTask : IGameTaskDefinition
 
 ## Creating States & FSM
 
-States define the finite state machine for your game automation.
+States define the finite state machine for your bot.
 
-### Interface
-
-```csharp
-public interface IStateDefinition
-{
-    string Id { get; }
-    string Name { get; }
-    string Category { get; }
-    Func<PerceptionContext?, bool> EntryCondition { get; }
-    IStateAction? Action { get; }
-    IReadOnlyList<string> NextStateIds { get; }
-    TimeSpan Timeout { get; }
-    RetryPolicy RetryPolicy { get; }
-    EvidencePolicy EvidencePolicy { get; }
-}
-```
-
-### State Implementation
+### Simple State
 
 ```csharp
-public sealed class IdleState : IStateDefinition
-{
-    public string Id => "idle";
-    public string Name => "Idle";
-    public string Category => "navigation";
-    
-    // Enter this state when no other conditions match
-    public Func<PerceptionContext?, bool> EntryCondition => ctx => true;
-    
-    public IStateAction? Action => null; // No continuous action
-    
-    public IReadOnlyList<string> NextStateIds => 
-        ["combat", "healing", "mana_restoring", "questing", "selling"];
-    
-    public TimeSpan Timeout => TimeSpan.FromMinutes(5);
-    public RetryPolicy RetryPolicy => new();
-    public EvidencePolicy EvidencePolicy => new(false, false);
-}
-
 public sealed class CombatState : IStateDefinition
 {
     public string Id => "combat";
-    public string Name => "In Combat";
+    public string Name => "Combat";
     public string Category => "combat";
     
-    // Enter when battle detector finds enemy
-    public Func<PerceptionContext?, bool> EntryCondition => ctx =>
-        ctx?.DetectorResults.Any(d => d.DetectorId == "enemy_detected" && d.IsMatch) == true;
+    public Func<PerceptionContext?, bool> EntryCondition => ctx => 
+        ctx?.Detections.Any(d => d.DetectorName.Contains("enemy") && d.IsMatch) ?? false;
     
     public IStateAction? Action => new CombatAction();
     
-    public IReadOnlyList<string> NextStateIds => 
-        ["idle", "healing", "mana_restoring", "looting", "fleeing", "dead"];
-    
-    public TimeSpan Timeout => TimeSpan.FromMinutes(3);
-    public RetryPolicy RetryPolicy => new(3, 1000, true);
-    public EvidencePolicy EvidencePolicy => new(true, false);
+    public IReadOnlyList<string> NextStateIds => ["idle", "healing", "fleeing"];
+    public TimeSpan Timeout => TimeSpan.FromMinutes(5);
+    public RetryPolicy RetryPolicy => new(3, 5000);
+    public EvidencePolicy EvidencePolicy => new(true, true);
 }
 ```
 
-### State Actions
+### State Action
 
 ```csharp
 public sealed class CombatAction : IStateAction
 {
-    private readonly IInputDispatcher _input;
-    private readonly ILogger<CombatAction> _logger;
-
-    public CombatAction(IInputDispatcher input, ILogger<CombatAction> logger)
-    {
-        _input = input;
-        _logger = logger;
-    }
-
     public async Task ExecuteAsync(CancellationToken ct)
     {
-        // Continuous combat logic
-        // 1. Check skill cooldowns
-        // 2. Use available skills
-        // 3. Move if needed
-        // 4. Check for emergency heal
-        
-        await Task.Delay(200, ct); // Combat loop interval
-    }
-}
-
-public sealed class HealingAction : IStateAction
-{
-    public async Task ExecuteAsync(CancellationToken ct)
-    {
-        // Use potion, cast heal spell, etc.
-        await Task.Delay(800, ct);
+        // Combat logic: attack, use skills, manage cooldowns
+        await Task.Delay(100, ct); // Placeholder
     }
 }
 ```
@@ -466,60 +295,42 @@ public sealed class HealingAction : IStateAction
 
 ## Configuration & Assets
 
-### Config Schema (JSON Schema)
+### Module Configuration Schema
+
+Define your module's configuration as JSON Schema:
 
 ```json
 {
   "type": "object",
   "properties": {
-    "autoAttack": { "type": "boolean", "default": true, "description": "Enable auto attack" },
-    "healThreshold": { "type": "integer", "minimum": 10, "maximum": 90, "default": 30, "description": "HP % to heal at" },
-    "manaThreshold": { "type": "integer", "minimum": 10, "maximum": 90, "default": 20, "description": "MP % to restore at" },
-    "lootFilter": { 
-      "type": "array", 
-      "items": { "type": "string" }, 
-      "default": ["rare", "epic", "legendary"],
-      "description": "Item qualities to loot"
-    },
-    "skillRotation": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": ["skill_1", "skill_2", "skill_3"],
-      "description": "Skill priority order"
+    "healThreshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.4 },
+    "manaThreshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.3 },
+    "attackRange": { "type": "number", "minimum": 1, "maximum": 500, "default": 200 },
+    "enableAutoBuff": { "type": "boolean", "default": true },
+    "buffCooldowns": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
     }
-  },
-  "required": ["autoAttack", "healThreshold", "manaThreshold", "lootFilter", "skillRotation"]
+  }
 }
 ```
 
-### Accessing Config in Plugin
+### Default Configuration
 
-```csharp
-public sealed class MyGameModule : IGameModule
+```json
 {
-    // Config is passed via Instance.Configuration (JSON string)
-    // Deserialize in your tasks/states:
-    
-    private MyGameConfig GetConfig(Instance instance)
-    {
-        return JsonSerializer.Deserialize<MyGameConfig>(instance.Configuration) 
-               ?? new MyGameConfig();
-    }
-}
-
-public record MyGameConfig
-{
-    public bool AutoAttack { get; init; } = true;
-    public int HealThreshold { get; init; } = 30;
-    public int ManaThreshold { get; init; } = 20;
-    public string[] LootFilter { get; init; } = ["rare", "epic", "legendary"];
-    public string[] SkillRotation { get; init; } = ["skill_1", "skill_2", "skill_3"];
+  "healThreshold": 0.4,
+  "manaThreshold": 0.3,
+  "attackRange": 200,
+  "enableAutoBuff": true,
+  "buffCooldowns": {
+    "buff1": 300,
+    "buff2": 600
+  }
 }
 ```
 
-### Assets
-
-Place assets in your project under `assets/` folder:
+### Asset Organization
 
 ```
 MyGamePlugin/
@@ -527,235 +338,148 @@ MyGamePlugin/
 │   ├── templates/
 │   │   ├── health_bar.png
 │   │   ├── mana_bar.png
-│   │   └── enemy_indicator.png
+│   │   └── enemy_icon.png
 │   ├── ocr/
-│   │   └── game_font.png
-│   └── sounds/
-│       └── alert.wav
+│   │   └── font_config.json
+│   └── config/
+│       └── default_settings.json
+├── KKBOT.Plugin.MyGame.csproj
+└── MyGameModule.cs
 ```
-
-Assets are copied to output and referenced in `Manifest.Assets`.
 
 ---
 
 ## Testing Your Plugin
 
-### 1. Unit Tests
+### Unit Tests
 
 ```csharp
 [Fact]
-public async Task HealthBarDetector_ReturnsValidResult()
-{
-    var detector = new HealthBarDetector();
-    var frame = CreateTestFrame(); // Helper to create test frame
-    
-    var result = await detector.DetectAsync(frame, CancellationToken.None);
-    
-    Assert.True(result.IsMatch);
-    Assert.InRange(result.Confidence, 0.8, 1.0);
-    Assert.NotNull(result.DetectedValue);
-}
-```
-
-### 2. Integration Test with Simulator
-
-```csharp
-[Fact]
-public async Task AutoAttackTask_ExecutesInCombatState()
+public async Task AutoHealTask_ShouldHeal_WhenHpLow()
 {
     // Arrange
-    var simulator = new SimulatedDeviceSession(...);
-    var plugin = new MyGameModule();
-    var task = plugin.GetTasks().First(t => t.Id == "auto_attack");
+    var mockDevice = new Mock<IDeviceSession>();
+    var mockPerception = new Mock<IPerceptionPipeline>();
+    var task = new AutoHealTask();
+    
+    // Mock low HP detection
+    mockPerception.Setup(p => p.ProcessAsync(It.IsAny<Frame>(), It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new[] { new DetectionResult { DetectorId = "health_bar", IsMatch = true, Confidence = 0.2 } });
     
     // Act
-    var context = new TaskContext(Guid.NewGuid(), Guid.NewGuid(), new Dictionary<string, object?>());
-    var nextState = await task.ExecuteAsync(context, CancellationToken.None);
+    var result = await task.ExecuteAsync(new TaskContext(...), CancellationToken.None);
     
     // Assert
-    Assert.IsType<CombatState>(nextState);
+    mockDevice.Verify(d => d.SendInputAsync(It.Is<InputCommand>(i => i.KeyCode == 0x31), It.IsAny<CancellationToken>()), Times.Once);
 }
 ```
 
-### 3. Manual Testing
+### Integration Tests
 
-1. Build plugin: `dotnet build -c Release`
-2. Copy DLL to `plugins/` folder
-3. Start KKBOT Dashboard
-4. Navigate to Plugins page → Reload
-5. Create instance with your plugin
-6. Start instance and monitor logs
+```bash
+# Run plugin tests
+dotnet test tests/KKBOT.Plugin.MyGame.Tests
+
+# Run integration tests
+dotnet test tests/KKBOT.Orchestration.Integration.Tests --filter "FullyQualifiedName~MyGame"
+```
 
 ---
 
 ## Packaging & Distribution
 
-### 1. Build Release
+### Build for Release
 
 ```bash
 dotnet build -c Release
+dotnet pack -c Release -o ./artifacts
 ```
 
-### 2. Create NuGet Package (Optional)
+### Plugin Package Structure
 
-```xml
-<!-- In .csproj -->
-<PropertyGroup>
-  <PackageId>KKBOT.Plugin.MyGame</PackageId>
-  <PackageVersion>1.0.0</PackageVersion>
-  <Authors>Your Name</Authors>
-  <Description>KKBOT plugin for My Game</Description>
-  <PackageTags>kkbot;plugin;game-automation</PackageTags>
-  <RepositoryUrl>https://github.com/your-repo/MyGamePlugin</RepositoryUrl>
-</PropertyGroup>
+```
+mygame-plugin-v1.0.0/
+├── KKBOT.Plugin.MyGame.dll
+├── KKBOT.Plugin.MyGame.pdb
+├── manifest.json
+├── assets/
+│   └── templates/
+│       ├── health_bar.png
+│       └── enemy_icon.png
+└── README.md
 ```
 
-```bash
-dotnet pack -c Release -o ./nupkg
+### Manifest.json
+
+```json
+{
+  "id": "my-game",
+  "name": "My Game Bot",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "Automation for My Game",
+  "supportedResolutions": [[1920, 1080]],
+  "requiredPermissions": ["DEVICE_READ", "INPUT_WRITE"],
+  "entryAssembly": "KKBOT.Plugin.MyGame.dll",
+  "assets": ["assets/templates/health_bar.png", "assets/templates/enemy_icon.png"]
+}
 ```
 
-### 3. Distribution Checklist
+### Publishing to Marketplace
 
-- [ ] DLL and PDB in output
-- [ ] All asset files copied (templates, OCR fonts, etc.)
-- [ ] Dependencies included (or documented as required)
-- [ ] `Manifest.Assets` lists all required files
-- [ ] `Manifest.ConfigSchema` validates user config
-- [ ] README with setup instructions
-- [ ] Version follows SemVer
+1. Build release package
+2. Sign with Ed25519 key
+3. Upload to marketplace via API or web UI
+3. Fill metadata (screenshots, changelog, compatibility)
+4. Submit for review
 
 ---
 
 ## Best Practices
 
-### 1. Error Handling
+### Performance
+- **Cache templates** - Load once, reuse across detections
+- **Parallel detectors** - Run independent detectors in parallel
+- **Frame skip** - Process every Nth frame for non-critical detections
+- **Memory management** - Dispose frames, use object pooling
 
-```csharp
-public async Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct)
-{
-    try
-    {
-        // Detection logic
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Detector {Id} failed", Id);
-        return new DetectorResult
-        {
-            DetectorId = Id,
-            DetectorName = Name,
-            Confidence = 0,
-            IsMatch = false,
-            DetectedValue = $"ERROR: {ex.Message}",
-            Timestamp = DateTime.UtcNow
-        };
-    }
-}
-```
+### Reliability
+- **Graceful degradation** - Fallback when detection fails
+- **Timeouts** - Set reasonable timeouts on all async operations
+- **Retry logic** - Exponential backoff for transient failures
+- **Health checks** - Monitor device connection, plugin health
 
-### 2. Cancellation Token Support
+### Security
+- **Least privilege** - Request minimum required permissions
+- **Input validation** - Validate all user/config inputs
+- **No hardcoded secrets** - Use configuration/secret store
+- **Input sanitization** - Prevent injection in AI prompts
 
-```csharp
-public async Task<IStateDefinition> ExecuteAsync(TaskContext context, CancellationToken ct)
-{
-    while (!ct.IsCancellationRequested)
-    {
-        await DoWorkAsync(ct);
-        await Task.Delay(100, ct); // Respect cancellation
-    }
-    return new IdleState();
-}
-```
+### Maintainability
+- **Single responsibility** - One detector/task per class
+- **Dependency injection** - Use DI for testability
+- **Logging** - Structured logging with correlation IDs
+- **Documentation** - XML docs for public APIs
 
-### 3. Logging
-
-```csharp
-private readonly ILogger<MyDetector> _logger;
-
-public MyDetector(ILogger<MyDetector> logger) => _logger = logger;
-
-public async Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct)
-{
-    _logger.LogDebug("Running detector {Id}", Id);
-    // ...
-    _logger.LogInformation("Detector {Id} found match with confidence {Confidence}", Id, result.Confidence);
-}
-```
-
-### 4. Dependency Injection
-
-Register services in your module's DI container:
-
-```csharp
-// In your plugin, you can use constructor injection for detectors/tasks
-public sealed class MyDetector : IGameDetector
-{
-    private readonly IOcrEngine _ocr;
-    private readonly ILogger<MyDetector> _logger;
-
-    public MyDetector(IOcrEngine ocr, ILogger<MyDetector> logger)
-    {
-        _ocr = ocr;
-        _logger = logger;
-    }
-    // ...
-}
-```
-
-### 5. Performance
-
-- Cache template images in memory
-- Use `RequiredConfidence` to filter early
-- Limit frame processing rate
-- Dispose OpenCV Mats properly
-
-### 6. Security
-
-- Never hardcode credentials
-- Use `ISecretManager` for API keys
-- Validate all user inputs
-- Request minimal permissions in manifest
+### Testing
+- **Unit test coverage** > 80%
+- **Integration tests** for critical paths
+- **Scenario tests** using Simulator DSL v2
+- **Chaos testing** - Random failures, network partitions
 
 ---
 
-## Example: Complete Plugin Structure
+## Example: Complete Plugin
 
-```
-MyGamePlugin/
-├── MyGamePlugin.csproj
-├── MyGameModule.cs           # Main module implementation
-├── Detectors/
-│   ├── HealthBarDetector.cs
-│   ├── ManaBarDetector.cs
-│   └── EnemyDetector.cs
-├── Tasks/
-│   ├── AutoAttackTask.cs
-│   ├── HealTask.cs
-│   └── LootTask.cs
-├── States/
-│   ├── IdleState.cs
-│   ├── CombatState.cs
-│   ├── HealingState.cs
-│   └── LootingState.cs
-├── Actions/
-│   ├── CombatAction.cs
-│   └── HealAction.cs
-├── Config/
-│   └── MyGameConfig.cs
-├── assets/
-│   └── templates/
-└── README.md
-```
+See `src/KKBOT.Plugin.Sample/SampleGameModule.cs` for a minimal working example.
 
 ---
 
-## Next Steps
+## Support
 
-1. Study the [Sample RPG Plugin](../samples/KKBOT.Plugin.SampleGame/SampleGameModule.cs)
-2. Check [API Reference](api-reference.md) for available services
-3. Join [Discussions](https://github.com/your-org/kkbot/discussions) for help
-4. Submit your plugin to the [Plugin Marketplace](https://github.com/your-org/kkbot-plugins) (coming soon)
+- **Documentation**: https://docs.kkbot.example.com/plugins
+- **API Reference**: https://docs.kkbot.example.com/api
+- **Community**: https://github.com/your-org/kkbot/discussions
+- **Issues**: https://github.com/your-org/kkbot/issues
 
----
-
-*Happy coding! 🎮🤖*
+*Happy coding! 🎮*

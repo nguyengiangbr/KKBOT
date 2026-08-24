@@ -13,42 +13,26 @@ Comprehensive system architecture documentation for KKBOT.
 7. [Design Decisions](#design-decisions)
 8. [Scalability & Performance](#scalability--performance)
 9. [Security Architecture](#security-architecture)
-10. [Extensibility Points](#extensibility-points)
+10. [Game-Specific Modules](#game-specific-modules)
 
 ---
 
 ## System Context
 
-### Context Diagram
+KKBOT is a **modular, extensible game automation platform** built with .NET 10. It provides a complete infrastructure for building game automation bots with enterprise-grade features.
 
-```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Player    │────▶│      KKBOT       │────▶│   Game Client   │
-│  (Human)    │     │   Platform       │     │   (Android/PC)  │
-└─────────────┘     └────────┬─────────┘     └────────┬────────┘
-                             │                        │
-                    ┌────────┴────────┐                │
-                    │                 │                │
-              ┌─────▼─────┐     ┌─────▼─────┐    ┌─────▼─────┐
-              │  Ollama   │     │ PostgreSQL│    │   ADB     │
-              │  (AI/LLM) │     │  (Data)   │    │  (Device) │
-              └───────────┘     └───────────┘    └───────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   Monitoring    │
-                    │ (Prom/Grafana)  │
-                    └─────────────────┘
-```
+### Key Characteristics
 
-### Actors
-
-| Actor | Description | Interactions |
-|-------|-------------|--------------|
-| **Player** | Human operator | Dashboard UI, CLI, API |
-| **Game Client** | Target application | ADB/Input, Screen capture |
-| **AI Provider** | Ollama/OpenAI | Text generation, Vision |
-| **Database** | PostgreSQL/SQLite | Persistence |
-| **Monitoring** | Prometheus/Grafana | Metrics, Logs, Alerts |
+| Aspect | Decision |
+|--------|----------|
+| Platform | .NET 10 (LTS) |
+| Architecture | Hexagonal (Ports & Adapters) |
+| Plugin Model | AssemblyLoadContext + WASM (Wasmtime) |
+| Communication | gRPC + REST + SignalR |
+| Data | EF Core (SQLite/PostgreSQL) + EventStore |
+| Messaging | Redis Pub/Sub + In-memory |
+| Observability | OpenTelemetry + Serilog + Prometheus |
+| Security | JWT + RBAC + Capability-based sandbox |
 
 ---
 
@@ -56,545 +40,246 @@ Comprehensive system architecture documentation for KKBOT.
 
 ### Hexagonal Architecture (Ports & Adapters)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DOMAIN LAYER                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │  Entities   │  │ Value Objs  │  │   Domain Events         │  │
-│  │ Instance    │  │ Resolution  │  │ InstanceCreated         │  │
-│  │ Job         │  │ Config      │  │ JobCompleted            │  │
-│  │ Module      │  │ Coordinates │  │ PluginLoaded            │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-│                          │                                      │
-│              ┌───────────┴───────────┐                          │
-│              │   Domain Services     │                          │
-│              │ InstanceManager       │                          │
-│              │ JobScheduler          │                          │
-│              │ PluginValidator       │                          │
-│              └───────────┬───────────┘                          │
-└──────────────────────────┼──────────────────────────────────────┘
-                           │ Ports (Interfaces)
-          ┌────────────────┼────────────────┐
-          ▼                ▼                ▼
-┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
-│   APPLICATION   │ │  INFRASTRUCTURE│ │    PRESENTATION│
-│   (Use Cases)   │ │  (Adapters)    │ │  (Controllers) │
-│                 │ │                │ │                │
-│ Commands/Queries│ │ EF Core        │ │ REST API       │
-│ Validators      │ │ ADB Client     │ │ Blazor Dashboard│
-│ Mediator        │ │ Ollama Client  │ │ SignalR Hub    │
-│ Event Handlers  │ │ File Secrets   │ │ Swagger UI     │
-│                 │ │ OpenCV         │ │                │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
-```
-
-### Layer Responsibilities
-
-| Layer | Responsibility | Technologies |
-|-------|----------------|--------------|
-| **Domain** | Business logic, rules, invariants | Pure C#, no dependencies |
-| **Application** | Use cases, orchestration, transactions | MediatR, FluentValidation |
-| **Infrastructure** | External adapters (DB, APIs, Hardware) | EF Core, HttpClient, OpenCvSharp |
-| **Presentation** | API endpoints, UI, CLI | ASP.NET Core, Blazor, Swagger |
-
-### Dependency Rule
+KKBOT follows the **Hexagonal Architecture** pattern to ensure separation of concerns and testability.
 
 ```
-Presentation → Application → Domain ← Infrastructure
-     ↑              ↑              ↑
-     └──────────────┴──────────────┘
-          (Interfaces defined in Domain/Application)
++-------------------------------------------------------------+
+|                        KKBOT Platform                       |
++-------------------------------------------------------------+
+|  +----------+  +----------+  +----------+  +----------+     |
+|  |  API     |  | Dashboard|  |  CLI     |  |  Plugins |  <- Adapters (Driving)
+|  |  Layer   |  | (Blazor) |  |  Tool    |  |  Loader  |
+|  +----+-----+  +----+-----+  +----+-----+  +----+-----+     |
+|       |             |             |             |             |
+|       +-------------+-------------+-------------+             |
+|                     v                                         |
+|  +----------------------------------------------------------+  |
+|  |                    Application Layer                      |  |  <- Application Core
+|  |  Commands | Queries | Validators | Mediator | Handlers   |  |
+|  +----------------------------------------------------------+  |
+|                     |                                         |
+|  +-------------------+------------------+-------------------+  |
+|  v                  v                  v                   v  |
+| +--------+    +------------+   +------------+         +------+ |
+| |Device  |    |Perception  |   |AI          |         |Orches| |  <- Ports (Driven)
+| |Abstraction    |Pipeline    |   |Services    |         |tration| |
+| +--------+    +------------+   +------------+         +------+ |
+|       |             |                  |                    |  |
+|  +----+-----+  +----+-----+     +-------+-------+          |  |
+|  | ADB     |  |OpenCV     |     |Ollama       |             |  |  <- Adapters (Driven)
+|  | Simulator| |Template   |     |Vision       |             |  |
+|  |         |  |Matcher    |     |             |             |  |
+|  +---------+  +-----------+     +-------------+             |  |
+|       |             |                  |                    |  |
+|       +-------------+------------------+--------------------+  |
+|                     v                                         |
+|  +----------------------------------------------------------+  |
+|  |              Persistence (EF Core) + Security             |  |
+|  +----------------------------------------------------------+  |
 ```
+
+### Core Principles
+
+1. **Domain-Centric** - Business logic in Domain layer, no external dependencies
+2. **Dependency Inversion** - Core depends on abstractions (Ports), not concretions
+3. **Plugin Isolation** - Each plugin runs in isolated AssemblyLoadContext or WASM
+4. **Event-Driven** - EventStore for audit trail, projections for read models
+5. **Capability-Based Security** - Deny-by-default with explicit capabilities
 
 ---
 
 ## Core Components
 
-### 1. Domain Models
+### 1. Domain Layer (KKBOT.Domain)
 
-```csharp
-// Core aggregates
-public record Instance(Guid Id, string Name, InstanceStatus Status, ModuleRef? Module);
-public record Job(Guid Id, Guid InstanceId, JobType Type, JobStatus Status, string Payload);
-public record Module(Guid Id, string Name, string Version, string EntryAssembly);
-public record Device(Guid Id, string Name, DeviceType Type, string ConnectionString);
+Pure domain models with no external dependencies.
 
-// Enums
-public enum InstanceStatus { Created, Running, Stopped, Error, Paused }
-public enum JobStatus { Pending, Running, Completed, Failed, Cancelled }
-public enum JobType { OneShot, Repeating, Manual }
-public enum DeviceType { ADB, Simulator, Emulator }
+| Entity | Description |
+|--------|-------------|
+| Instance | Game automation instance with state machine |
+| Device | Physical/virtual device abstraction |
+| Module | Game plugin metadata |
+| Job | Scheduled automation work |
+| TaskRun | Execution tracking |
+| Profile | Game configuration |
+| Operator | User/operator management |
+| Schedule | Recurring job definitions |
 
-// Events
-public record InstanceCreatedEvent(Guid InstanceId);
-public record JobCompletedEvent(Guid InstanceId, Guid JobId, bool Success);
-public record PluginLoadedEvent(string PluginId, string Version);
-```
+### 2. Application Layer (KKBOT.Application)
 
-### 2. Plugin System
+Use cases and business logic orchestration.
 
-```csharp
-// Plugin Contract (defined in KKBOT.Plugins.Abstractions)
-public interface IGameModule
-{
-    string Id { get; }
-    string Version { get; }
-    ModuleManifest GetManifest();
-    IReadOnlyCollection<IGameDetector> GetDetectors();
-    IReadOnlyCollection<IGameTaskDefinition> GetTasks();
-    IReadOnlyCollection<IStateDefinition> GetStates();
-    Task<ModuleValidationResult> ValidateAsync(ModuleContext context, CancellationToken ct);
-}
+| Pattern | Implementation |
+|---------|----------------|
+| CQRS | Commands (mutations) + Queries (reads) |
+| MediatR | In-process message bus |
+| Validators | FluentValidation pipeline behaviors |
+| Behaviors | Logging, Validation, Transaction, Retry |
 
-// Plugin Loader (KKBOT.Plugins.Loader)
-public sealed class PluginLoader
-{
-    public async Task<IReadOnlyCollection<IGameModule>> LoadPluginsAsync(string path, CancellationToken ct);
-}
+### 3. Orchestration Layer (KKBOT.Orchestration)
 
-// Isolation via AssemblyLoadContext
-internal sealed class PluginLoadContext : AssemblyLoadContext
-{
-    // Loads plugin + dependencies from plugin folder
-}
-```
+Core automation orchestration engine.
 
-### 3. Perception Pipeline
+| Component | Responsibility |
+|-----------|----------------|
+| InstanceManager | Instance lifecycle (Create, Start, Stop, Pause, Resume) |
+| Scheduler | Job scheduling, queuing, concurrency control |
+| DagScheduler | DAG-based task execution with dependencies |
+| InstanceOrchestrator | FSM execution from plugin states |
+| RecoveryCoordinator | Escalation ladder, auto-recovery |
+| EventStore | Event sourcing with snapshots/projections |
+| SagaOrchestrator | Compensation-based transactions |
 
-```csharp
-// Detector Interface
-public interface IGameDetector
-{
-    string Id { get; }
-    string Name { get; }
-    DetectorType Type { get; }  // TemplateMatch, ColorAnalysis, Ocr, Custom
-    double RequiredConfidence { get; }
-    Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct);
-}
+### 4. Plugin System (KKBOT.Plugins.*)
 
-// Pipeline
-public interface IPerceptionPipeline
-{
-    Task<IReadOnlyList<DetectorResult>> ProcessAsync(Frame frame, CancellationToken ct);
-}
+Extensible plugin architecture.
 
-// Frame Data
-public record Frame(Guid Id, byte[] Data, int Width, int Height, PixelFormat Format, DateTime Timestamp);
-```
+| Component | Purpose |
+|-----------|---------|
+| AssemblyLoadContext | .NET plugin isolation |
+| Wasmtime | WASM sandbox (20 capabilities) |
+| PluginLoader | Discovery, validation, hot-reload |
+| Manifest | Plugin metadata, permissions, config schema |
 
-### 4. AI Services
+### 4. Device Layer (KKBOT.Device.*)
 
-```csharp
-// Text Generation
-public interface IAiService
-{
-    Task<AiResponse> GenerateAsync(string prompt, CancellationToken ct);
-}
+Hardware abstraction layer.
 
-// Vision
-public interface IAiVisionService
-{
-    Task<AiResponse> GenerateAsync(byte[] imageData, string prompt, CancellationToken ct);
-}
+| Adapter | Capabilities |
+|---------|--------------|
+| ADB | Android devices (screenshot, input, shell, apps) |
+| Simulator | Headless testing, scenario DSL v2, frame replay |
+| Scrcpy | Low-latency streaming (planned) |
 
-// Ollama Implementation
-public sealed class OllamaService : IAiService
-{
-    private readonly HttpClient _http;
-    private readonly OllamaOptions _options;
-    
-    public async Task<AiResponse> GenerateAsync(string prompt, CancellationToken ct)
-    {
-        // POST /api/generate with streaming support
-    }
-}
-```
+### 5. Perception Pipeline (KKBOT.Perception.*)
 
-### 5. Orchestration
+Computer vision capabilities.
 
-```csharp
-// DAG Scheduler
-public sealed class DagScheduler
-{
-    public async Task RunAsync(IReadOnlyList<DagJob> jobs, 
-        Func<DagJob, CancellationToken, Task<bool>> runJob, CancellationToken ct);
-}
+| Component | Technology |
+|-----------|------------|
+| Template Matching | OpenCV (TM_CCOEFF_NORMED) |
+| OCR | Tesseract / PaddleOCR |
+| Pipeline | Parallel detector execution |
+| Preprocessing | Grayscale, resize, denoise |
 
-// Instance Orchestrator
-public sealed class InstanceOrchestrator
-{
-    public async Task RunInstanceAsync(Instance instance, string pluginsPath, CancellationToken ct);
-}
+### 6. AI Services (KKBOT.AI.*)
 
-// Event Store
-public sealed class EventStore
-{
-    public void Append(IOrchestrationEvent evt);
-    public IReadOnlyCollection<IOrchestrationEvent> GetAll();
-}
-```
+LLM and vision integration.
 
-### 5. Device Abstraction
+| Service | Provider | Features |
+|---------|----------|----------|
+| IAiService | Ollama | Text gen, streaming, function calling |
+| IAiVisionService | Ollama | Vision, image analysis |
+| IAiPipeline | Local/Cloud | Training, inference, feature store |
 
-```csharp
-// Session Interface
-public interface IDeviceSession : IAsyncDisposable
-{
-    DeviceInfo Info { get; }
-    Task<Frame> CaptureAsync(CancellationToken ct);
-    Task<DispatchResult> SendInputAsync(InputCommand command, CancellationToken ct);
-    Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct);
-    Task StartAppAsync(string packageName, CancellationToken ct);
-    Task StopAppAsync(string packageName, CancellationToken ct);
-}
+### 8. Multi-Agent Coordination (KKBOT.Agent.Coordination)
 
-// ADB Implementation
-public sealed class AdbDeviceSession : IDeviceSession
-{
-    private readonly AdbCommandRunner _runner;
-    private readonly string _deviceSerial;
-}
+Distributed agent coordination.
 
-// Simulator (for testing)
-public sealed class SimulatedDeviceSession : IDeviceSession { }
-```
+| Component | Technology |
+|-----------|------------|
+| Agent Registry | Redis (TTL, capability indexing) |
+| Message Bus | Redis Pub/Sub + Streams |
+| Consensus | Raft-inspired (2/3 majority) |
+| Leader Election | Priority-based |
+| Distributed Lock | Redlock (Lua scripts) |
 
 ---
 
 ## Data Flow
 
-### Instance Lifecycle
+### Game Automation Loop
 
-```
-1. CREATE INSTANCE
-   POST /api/v1/instances
-   │
-   ▼
-   InstanceCreated (Domain Event)
-   │
-   ▼
-2. LOAD PLUGIN
-   PluginLoader.LoadPluginsAsync("plugins")
-   │
-   ▼
-   PluginLoadedEvent
-   │
-   ▼
-3. START INSTANCE
-   InstanceOrchestrator.RunInstanceAsync()
-   │
-   ├──▶ DagScheduler: Run task DAG
-   │       │
-   │       ├──▶ Task: Capture Frame
-   │       │       │
-   │       │       ▼
-   │       │   DeviceSession.CaptureAsync()
-   │       │       │
-   │       │       ▼
-   │       │   PerceptionPipeline.ProcessAsync()
-   │       │       │
-   │       │       ├──▶ Detector 1 (Template Match)
-   │       │       ├──▶ Detector 2 (OCR)
-   │       │       └──▶ Detector N...
-   │       │       │
-   │       │       ▼
-   │       │   State Machine: Evaluate EntryConditions
-   │       │       │
-   │       │       ▼
-   │       │   StateAction.ExecuteAsync()
-   │       │       │
-   │       │       ▼
-   │       │   DeviceSession.SendInputAsync()
-   │       │
-   ├──▶ EventStore: Append events
-   │
-   ▼
-4. MONITOR & CONTROL
-   Health checks, metrics, dashboard updates
-```
+Device -> Perceive -> Decide -> Execute -> Feedback Loop
 
-### Job Execution Flow
+### Event Sourcing Flow
 
-```
-Job Created (Pending)
-    │
-    ▼
-Job Scheduler picks up (Priority + ScheduledAt)
-    │
-    ▼
-Job Status → Running
-    │
-    ▼
-Execute Task:
-  1. Get Instance Device Session
-  2. Run Perception Pipeline
-  3. Evaluate State Machine
-  4. Execute State Action
-  5. Send Input Commands
-    │
-    ▼
-Job Status → Completed / Failed
-    │
-    ▼
-EventStore: JobCompletedEvent
-    │
-    ▼
-Metrics Updated
-    │
-    ▼
-Notification (if configured)
-```
+Command -> Handler -> Events -> EventStore -> Projections -> Read Models
+                    |
+                    +-> Snapshots (every N events)
+                    +-> Upcasters (v1 to v2 migration)
 
-### Plugin Hot Reload
+### Multi-Agent Coordination
 
-```
-File Watcher detects .dll change in plugins/
-    │
-    ▼
-PluginLoader.LoadPluginsAsync() (new AssemblyLoadContext)
-    │
-    ▼
-Validate Manifests & Dependencies
-    │
-    ▼
-Swap Plugin References (atomic)
-    │
-    ▼
-EventStore: PluginReloadedEvent
-    │
-    ▼
-Notify Dashboard (SignalR)
-```
+Agent A -> MessageBus <- Agent B
+   |                         |
+   +-------> Registry <------+
+   |                         |
+   +-------> Coordination <--+
+          |      |      |
+          v      v      v
+       Consensus  Lock  Sync
 
 ---
 
 ## Deployment Architecture
 
-### Development (Docker Compose)
+### Local Development
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Docker Network                           │
-│  ┌────────────┐  ┌──────────┐  ┌────────┐  ┌────────────┐  │
-│  │  KKBOT     │  │PostgreSQL│  │ Redis  │  │  Ollama    │  │
-│  │  (API+UI)  │  │  (DB)    │  │(Cache) │  │  (AI)      │  │
-│  │  :8080     │  │  :5432   │  │ :6379  │  │  :11434    │  │
-│  └────────────┘  └──────────┘  └────────┘  └────────────┘  │
-│       │               │            │            │            │
-│       └───────────────┴────────────┴────────────┘            │
-│                           │                                    │
-│              ┌────────────▼────────────┐                       │
-│              │      Volumes            │                       │
-│              │  data, logs, plugins    │                       │
-│              └─────────────────────────┘                       │
-└─────────────────────────────────────────────────────────────┘
-```
+API (Port 5000) + Dashboard (Port 5001) + Plugins (Folder) -> SQLite + Redis
 
 ### Production (Kubernetes)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Kubernetes Cluster                            │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                   Namespace: kkbot                       │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐ │   │
-│  │  │ KKBOT    │ │ KKBOT    │ │ KKBOT    │ │ Prometheus │ │   │
-│  │  │ Deployment (HPA)     │ │ Grafana  │ │ + Alertmgr │ │   │
-│  │  └──────────┘ └──────────┘ └──────────┘ └────────────┘ │   │
-│  │       │           │           │           │             │   │
-│  │  ┌────┴────┐ ┌────┴────┐ ┌────┴────┐ ┌────┴────┐       │   │
-│  │  │ Service │ │ Service │ │ Service │ │ Service   │       │   │
-│  │  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘       │   │
-│  │       │           │           │           │             │   │
-│  │  ┌────▼───────────▼───────────▼───────────▼────┐        │   │
-│  │  │           ConfigMap + Secrets              │        │   │
-│  │  └────────────────────────────────────────────┘        │   │
-│  │       │           │           │           │             │   │
-│  │  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐ ┌────▼────┐       │   │
-│  │  │  PVC    │ │  PVC    │ │  PVC    │ │  PVC    │       │   │
-│  │  │ (Data)  │ │ (Logs)  │ │(Plugins)│ │(Postgres)│       │   │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘       │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                              │                                 │
-│  ┌───────────────────────────▼──────────────────────────────┐  │
-│  │              External Dependencies                        │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │  │
-│  │  │ Ingress  │  │ Vault    │  │ PostgreSQL│  │  Ollama  │  │  │
-│  │  │ (NGINX)  │  │ (Secrets)│  │ (Managed) │  │ (GPU)    │  │  │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘  │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### GitOps Flow
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Developer │───▶│   GitHub    │───▶│  GitHub     │───▶│  ArgoCD /   │
-│   Pushes    │    │   Repository│    │  Actions    │    │  Flux       │
-└─────────────┘    └─────────────┘    └──────┬──────┘    └──────┬──────┘
-                                             │                  │
-                                    ┌────────┴────────┐         │
-                                    ▼                 ▼         ▼
-                              ┌──────────┐    ┌──────────┐ ┌──────────┐
-                              │ Build &  │    │ Security │ │ Deploy   │
-                              │ Test     │    │ Scan     │ │ to K8s   │
-                              └──────────┘    └──────────┘ └──────────┘
-```
+Ingress (NGINX) -> API Pod (x3) / Dashboard Pod / Workers (xN) -> PostgreSQL + Redis Cluster + MinIO
 
 ---
 
 ## Technology Stack
 
-### Backend
-
-| Category | Technology | Version | Purpose |
-|----------|------------|---------|---------|
-| Runtime | .NET | 10.0 | Core framework |
-| Web Framework | ASP.NET Core | 10.0 | API, Blazor Server |
-| ORM | Entity Framework Core | 8.0 | Database access |
-| DI | Microsoft.Extensions.DI | 8.0 | Dependency injection |
-| Mediation | MediatR | 12.0 | CQRS, decoupling |
-| Validation | FluentValidation | 11.0 | Input validation |
-| Resilience | Polly | 8.0 | Retry, circuit breaker |
-| Logging | Serilog | 2.12 | Structured logging |
-| Metrics | Prometheus.AspNetCore | 8.0 | Metrics exposition |
-| Tracing | OpenTelemetry | 1.7 | Distributed tracing |
-
-### Computer Vision
-
-| Library | Version | Purpose |
-|---------|---------|---------|
-| OpenCvSharp4 | 4.8 | OpenCV bindings |
-| Tesseract (optional) | 5.x | OCR engine |
-
-### AI
-
-| Service | Model | Purpose |
-|---------|-------|---------|
-| Ollama | llama3.1:8b | Text generation |
-| Ollama | llava:7b | Vision (image + text) |
-
-### Frontend
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Blazor Server | 10.0 | Interactive UI |
-| MudBlazor | 6.19 | Component library |
-| SignalR | 10.0 | Real-time updates |
-
-### Infrastructure
-
-| Component | Technology | Version |
-|-----------|------------|---------|
-| Containerization | Docker | 24+ |
-| Orchestration | Kubernetes | 1.28+ |
-| Package Manager | Helm | 3.12+ |
-| CI/CD | GitHub Actions | - |
-| Service Mesh | Istio (optional) | 1.20+ |
-| Monitoring | Prometheus + Grafana | 2.48 / 10.2 |
-| Logging | Loki + Promtail | 2.9 |
-| Tracing | Jaeger / Tempo | 1.50 / 2.3 |
-| Secret Management | HashiCorp Vault | 1.15 |
-
-### Database
-
-| Environment | Database | Version |
-|-------------|----------|---------|
-| Development | SQLite | 3.45 |
-| Production | PostgreSQL | 16 |
-| Cache | Redis | 7 |
+| Layer | Technology | Version |
+|-------|------------|---------|
+| Runtime | .NET | 10.0 LTS |
+| Web Framework | ASP.NET Core | 10.0 |
+| UI | Blazor Server + MudBlazor | 8.x |
+| ORM | EF Core | 8.0 |
+| Database | SQLite / PostgreSQL | 16 |
+| Cache/Message | Redis | 7.0 |
+| Serialization | System.Text.Json | 8.0 |
+| DI Container | Microsoft.Extensions.DI | 8.0 |
+| Logging | Serilog | 2.12 |
+| Tracing | OpenTelemetry | 1.7 |
+| Metrics | Prometheus | 2.45 |
+| Templating | Razor | 10.0 |
+| gRPC | Grpc.AspNetCore | 2.57 |
+| WASM | Wasmtime | 18.0 |
+| Computer Vision | OpenCV | 4.8 |
+| AI | Ollama / Semantic Kernel | Latest |
 
 ---
 
 ## Design Decisions
 
-### 1. Hexagonal Architecture
+### ADR-001: Use .NET 10 LTS
+**Status**: Accepted
+**Rationale**: Long-term support, latest language features, cross-platform
 
-**Decision**: Use Ports & Adapters (Hexagonal) architecture.
+### ADR-002: Hexagonal Architecture
+**Status**: Accepted
+**Rationale**: Separation of concerns, testability, plugin extensibility
 
-**Rationale**:
-- Domain isolation from infrastructure
-- Testability without external dependencies
-- Easy to swap implementations (SQLite ↔ PostgreSQL, ADB ↔ Simulator)
-- Clear separation of concerns
+### ADR-003: FSM for Workflow
+**Status**: Accepted
+**Rationale**: Deterministic state transitions, clear recovery paths
 
-**Trade-offs**:
-- More boilerplate (interfaces, adapters)
-- Learning curve for team
+### ADR-004: DI via Microsoft.Extensions.Hosting
+**Status**: Accepted
+**Rationale**: Standard, works with all project types
 
-### 2. Plugin Architecture with AssemblyLoadContext
+### ADR-005: AssemblyLoadContext for Plugins
+**Status**: Accepted
+**Rationale**: Isolation without process overhead
 
-**Decision**: Isolate plugins in collectible AssemblyLoadContext.
+### ADR-006: WASM for Untrusted Plugins
+**Status**: Accepted
+**Rationale**: True memory isolation, capability-based security
 
-**Rationale**:
-- Hot reload without app restart
-- Dependency isolation (different plugin versions)
-- Security boundary (future: sandbox)
-- Unload unused plugins to free memory
+### ADR-007: Event Sourcing for Audit
+**Status**: Accepted
+**Rationale**: Complete audit trail, temporal queries, replay capability
 
-**Trade-offs**:
-- Complexity in dependency resolution
-- Cannot share singleton state across plugins
-- Serialization across context boundaries
-
-### 3. MediatR for CQRS
-
-**Decision**: Use MediatR for commands/queries.
-
-**Rationale**:
-- Decouples handlers from controllers
-- Pipeline behaviors (validation, logging, transactions)
-- Easy to add cross-cutting concerns
-- Testable handlers
-
-**Trade-offs**:
-- Indirection (harder to navigate code)
-- Overhead for simple CRUD
-
-### 4. EF Core with SQLite/PostgreSQL
-
-**Decision**: EF Core as ORM, support both SQLite and PostgreSQL.
-
-**Rationale**:
-- Code-first migrations
-- LINQ queries, type safety
-- Easy testing with InMemory/SQLite
-- PostgreSQL for production scale
-
-**Trade-offs**:
-- Migration complexity for schema changes
-- Performance tuning required for high load
-
-### 5. Blazor Server for Dashboard
-
-**Decision**: Blazor Server over Blazor WebAssembly.
-
-**Rationale**:
-- Direct access to server services (no API layer needed for UI)
-- Smaller download size
-- Better for internal tools
-- Real-time via SignalR built-in
-
-**Trade-offs**:
-- Requires persistent connection
-- Server memory per connection
-- Latency on high-latency networks
-
-### 6. OpenCV for Computer Vision
-
-**Decision**: OpenCvSharp4 for template matching.
-
-**Rationale**:
-- Industry standard, performant
-- Multiple match methods
-- GPU acceleration support
-- Mature .NET bindings
-
-**Trade-offs**:
-- Native dependencies (platform-specific)
-- Large binary size
-- Learning curve
+### ADR-008: Redis for Coordination
+**Status**: Accepted
+**Rationale**: Pub/Sub, distributed locks, distributed cache
 
 ---
 
@@ -602,238 +287,104 @@ Notify Dashboard (SignalR)
 
 ### Horizontal Scaling
 
-| Component | Scaling Strategy |
-|-----------|------------------|
-| **API/UI** | HPA based on CPU/Memory, max 10 replicas |
-| **Job Workers** | Separate deployment, scale by queue depth |
-| **Plugin Loader** | Singleton per pod, plugins shared via ReadOnlyMany PVC |
-| **Database** | Read replicas, connection pooling (20 max) |
-| **Redis** | Cluster mode for cache scaling |
-| **Ollama** | GPU node pool, model sharding |
+| Component | Strategy |
+|-----------|----------|
+| API | Stateless, HPA (CPU 70%) |
+| Workers | Queue-based, N consumers |
+| Dashboard | Sticky sessions or stateless |
+| Redis | Cluster mode |
+| PostgreSQL | Read replicas + PgBouncer |
 
-### Performance Targets
+### Performance Optimizations
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| API Latency (p95) | < 200ms | `/api/v1/*` |
-| Frame Processing | < 50ms | Perception pipeline |
-| Job Dispatch | < 100ms | Queue to start |
-| Plugin Load | < 5s | 10 plugins |
-| Dashboard Update | < 1s | SignalR push |
+| Optimization | Implementation |
+|--------------|----------------|
+| L2 Cache | L1 (Memory) + L2 (Redis) |
+| Connection Pooling | HTTP, Redis, DB, gRPC |
+| Compiled Queries | EF Core compiled queries |
+| Object Pooling | Memory-efficient allocations |
+| Async/Await | Full async pipeline |
+| Streaming | IAsyncEnumerable for AI responses |
 
-### Caching Strategy
+### Resource Limits (Per Instance)
 
-| Data | Cache | TTL | Invalidation |
-|------|-------|-----|--------------|
-| Plugin Manifests | Memory | 5 min | File watcher |
-| AI Responses | Memory | 30 min | Key-based |
-| Instance Config | Memory | 1 min | On update |
-| Device Info | Memory | 30 sec | Health check |
-
-### Database Optimization
-
-```sql
--- Key indexes
-CREATE INDEX IX_Jobs_InstanceId_Status ON Jobs(InstanceId, Status);
-CREATE INDEX IX_Jobs_CreatedAt ON Jobs(CreatedAt DESC);
-CREATE INDEX IX_Instances_Status ON Instances(Status);
-CREATE INDEX IX_Instances_ModuleId ON Instances(ModuleId);
-
--- Partitioning (PostgreSQL)
-CREATE TABLE jobs_partitioned (LIKE jobs INCLUDING ALL) PARTITION BY RANGE (CreatedAt);
-```
+| Resource | Default Limit |
+|----------|---------------|
+| CPU | 2 cores |
+| Memory | 2 GB |
+| GPU | Optional |
+| FPS | Configurable (5-60) |
 
 ---
 
 ## Security Architecture
 
-### Defense in Depth
+### Authentication & Authorization
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Network Perimeter                         │
-│  WAF, DDoS Protection, TLS 1.3, Rate Limiting               │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                   Kubernetes Network                          │
-│  Network Policies, mTLS (Istio), Egress Control              │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    Pod Security                               │
-│  Non-root, ReadOnlyRootFS, Drop ALL Capabilities             │
-│  Seccomp, AppArmor, SELinux                                  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                  Application Security                         │
-│  Input Validation, Output Encoding, CSP, Security Headers    │
-│  Secret Management (Vault), Encryption (AES-256-GCM)         │
-│  Audit Logging, Rate Limiting, JWT/OAuth2 (planned)          │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    Data Security                              │
-│  Encryption at Rest (DB), Encryption in Transit (TLS)        │
-│  Key Rotation, Data Classification, Retention Policies       │
-└──────────────────────────────────────────────────────────────┘
-```
+| Layer | Mechanism |
+|-------|-----------|
+| Authentication | JWT (RS256), Refresh Tokens |
+| Authorization | RBAC + Resource-based (PermissionAuthorizationHandler) |
+| API Security | Rate Limiting, CORS, Security Headers |
+| Secrets | AES-256, Key Rotation, Vault-ready |
 
-### Zero Trust Principles
+### Plugin Security
 
-1. **Verify Explicitly** - Every request authenticated & authorized
-2. **Least Privilege** - Minimal RBAC, scoped secrets
-3. **Assume Breach** - Monitoring, segmentation, encryption
+| Layer | Protection |
+|-------|------------|
+| Sandbox | WASM (Wasmtime) with fuel metering |
+| Capabilities | 20 granular permissions |
+| Signing | Ed25519 signatures |
+| Isolation | AssemblyLoadContext / WASM memory isolation |
+
+### Data Protection
+
+| Data | Protection |
+|------|------------|
+| Secrets | AES-256-GCM, Key Rotation |
+| PII | Encryption at rest, Minimization |
+| Audit | Immutable, Append-only |
+| Transport | TLS 1.3, mTLS for gRPC |
 
 ---
 
-## Extensibility Points
+## Game-Specific Modules
 
-### 1. Custom Detectors
+### Module 1: Account & Auto-Login
+- Auto login/relogin with credential injection
+- Server/Channel/Character selection
+- Security screens (PIN/OTP/Captcha)
+- Crash recovery with auto-relogin
 
-```csharp
-public interface IGameDetector
-{
-    Task<DetectorResult> DetectAsync(Frame frame, CancellationToken ct);
-}
+### Module 3: Resource Optimizer
+- FPS Limiter (5-10 background)
+- Render Stripping (3D, particles, shadows)
+- RAM Cleaner (periodic, threshold-based)
+- Window Grid Layout (tile, minimize, tray)
 
-// Register in plugin
-public IReadOnlyCollection<IGameDetector> GetDetectors() 
-    => [new MyCustomDetector()];
-```
+### Module 7: Anti-Detection
+- Humanizer (delays, jitter, Bezier curves)
+- Telegram Alerts (Death, VIP, Disconnect)
+- Remote Control (Telegram Bot)
 
-### 2. Custom Tasks
-
-```csharp
-public interface IGameTaskDefinition
-{
-    Task<IStateDefinition> ExecuteAsync(TaskContext context, CancellationToken ct);
-}
-
-// Register in plugin
-public IReadOnlyCollection<IGameTaskDefinition> GetTasks() 
-    => [new MyCustomTask()];
-```
-
-### 3. Custom States
-
-```csharp
-public interface IStateDefinition
-{
-    Func<PerceptionContext?, bool> EntryCondition { get; }
-    IStateAction? Action { get; }
-    IReadOnlyList<string> NextStateIds { get; }
-}
-
-// Register in plugin
-public IReadOnlyCollection<IStateDefinition> GetStates() 
-    => [new MyCustomState()];
-```
-
-### 4. Custom AI Providers
-
-```csharp
-public interface IAiService
-{
-    Task<AiResponse> GenerateAsync(string prompt, CancellationToken ct);
-}
-
-// Register in DI
-services.AddSingleton<IAiService, MyCustomAiProvider>();
-```
-
-### 5. Custom Device Drivers
-
-```csharp
-public interface IDeviceSession
-{
-    Task<Frame> CaptureAsync(CancellationToken ct);
-    Task<DispatchResult> SendInputAsync(InputCommand command, CancellationToken ct);
-}
-
-// Register in DI
-services.AddSingleton<IDeviceSessionFactory, MyDeviceFactory>();
-```
-
-### 6. Custom Secret Managers
-
-```csharp
-public interface ISecretManager
-{
-    Task<string?> GetSecretAsync(string key, CancellationToken ct);
-}
-
-// Register in DI
-services.AddSingleton<ISecretManager, AzureKeyVaultSecretManager>();
-```
-
-### 7. Pipeline Behaviors (MediatR)
-
-```csharp
-public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-{
-    public async Task<TResponse> Handle(TRequest request, 
-        RequestHandlerDelegate<TResponse> next, CancellationToken ct)
-    {
-        _logger.LogInformation("Handling {Request}", typeof(TRequest).Name);
-        var response = await next();
-        _logger.LogInformation("Handled {Request}", typeof(TRequest).Name);
-        return response;
-    }
-}
-
-// Register
-services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-```
-
-### 8. Health Check Contributions
-
-```csharp
-public class PluginHealthCheck : IHealthCheck
-{
-    private readonly PluginLoader _loader;
-    
-    public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context, CancellationToken ct)
-    {
-        var plugins = await _loader.LoadPluginsAsync("plugins", ct);
-        return plugins.Count > 0 
-            ? HealthCheckResult.Healthy($"{plugins.Count} plugins loaded")
-            : HealthCheckResult.Degraded("No plugins loaded");
-    }
-}
-
-// Register
-builder.Services.AddHealthChecks()
-    .AddCheck<PluginHealthCheck>("plugins");
-```
+### Planned Modules
+- Module 2: Network & Proxy Binding
+- Module 4: Logistics & Survival
+- Module 5: Combat & Quest Engine
+- Module 6: Economy & Trading
 
 ---
 
-## Future Evolution
+## Related Documents
 
-### Planned Enhancements
-
-| Area | Enhancement | Priority |
-|------|-------------|----------|
-| **Multi-tenancy** | Tenant isolation, per-tenant plugins | High |
-| **Event Sourcing** | Full event store, projections, snapshots | Medium |
-| **Saga Pattern** | Distributed transactions for complex workflows | Medium |
-| **Plugin Marketplace** | Registry, dependency resolution, versions | High |
-| **ML Pipeline** | Custom model training, inference pipeline | Low |
-| **Mobile App** | React Native companion app | Low |
-| **WebAssembly Plugins** | Sandbox plugins in WASM | Medium |
-
-### Technical Debt
-
-- [ ] Replace SQLite with PostgreSQL in all environments
-- [ ] Implement proper JWT authentication
-- [ ] Add OpenTelemetry auto-instrumentation
-- [ ] Migrate to .NET 10 native AOT
-- [ ] Implement plugin sandboxing (WASM)
-- [ ] Add GraphQL API alongside REST
+- [Deployment Guide](DEPLOYMENT.md)
+- [Configuration Reference](configuration.md)
+- [Plugin Development](plugin-development.md)
+- [GameAgent Framework](GAME_AGENT_FRAMEWORK_SPEC.md)
+- [Multi-Agent Coordination](MULTI_AGENT_COORDINATION_FRAMEWORK.md)
+- [API Reference](api-reference.md)
 
 ---
 
-*Document version: 1.0.0 | Last updated: 2024-01-15*
+*Last Updated: 2025-01-15*
+*Version: 24.1.0*

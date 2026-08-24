@@ -1,0 +1,242 @@
+@* Node Properties Editor Component *@
+@inject IJSRuntime JS
+
+<div class="node-properties-editor">
+    @if (Node == null)
+    {
+        <div class="text-center text-muted p-3">
+            <i class="oi oi-chevron-left" style="font-size: 2rem;"></i>
+            <p class="mt-2">Select a node to edit properties</p>
+        </div>
+    }
+    else
+    {
+        <div class="property-group">
+            <label class="form-label">Node Type</label>
+            <input type="text" class="form-control form-control-sm" value="@Node.DisplayName" readonly />
+        </div>
+        
+        <div class="property-group">
+            <label class="form-label">Node ID</label>
+            <input type="text" class="form-control form-control-sm font-monospace small" value="@Node.Id" readonly />
+        </div>
+        
+        <hr class="my-2" />
+        
+        @if (Node.Properties != null && Node.Properties.Count > 0)
+        {
+            @foreach (var prop in Node.Properties)
+            {
+                <PropertyEditor 
+                    Key="@prop.Key" 
+                    Value="@prop.Value" 
+                    NodeType="@Node.Type"
+                    OnChanged="@((key, value) => OnChanged.InvokeAsync((key, value)))" />
+            }
+        }
+        else
+        {
+            <div class="text-center text-muted p-2">
+                <i class="oi oi-info" style="font-size: 1.5rem;"></i>
+                <p class="mt-1 small">No properties for this node type</p>
+            </div>
+        }
+        
+        <hr class="my-2" />
+        
+        <div class="property-group">
+            <label class="form-label">Ports</label>
+            <div class="ports-list">
+                @foreach (var port in Node.Ports)
+                {
+                    <div class="port-item d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="badge @(port.Type == PortType.Input ? "bg-primary" : "bg-danger") me-2">
+                                @port.Type.ToString()
+                            </span>
+                            <span class="small">@port.Name</span>
+                        </div>
+                        <span class="badge bg-secondary small">@port.Id</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EditorNode? Node { get; set; }
+    [Parameter] public EventCallback<(string Key, object Value)> OnChanged { get; set; }
+}
+
+@* Property Editor Component *@
+<div class="property-editor mb-2">
+    <label class="form-label small fw-bold">@GetDisplayName(Key)</label>
+    @switch (GetValueType(Key, Value))
+    {
+        case "string":
+            <input type="text" class="form-control form-control-sm" 
+                   value="@Value?.ToString()" 
+                   @onchange="((e) => OnChanged.InvokeAsync((Key, e.Value?.ToString() ?? "")))"
+                   placeholder="@GetPlaceholder(Key)" />
+            break;
+        case "int":
+            <input type="number" class="form-control form-control-sm" 
+                   value="@Convert.ToInt32(Value)" 
+                   @onchange="((e) => OnChanged.InvokeAsync((Key, Convert.ToInt32(e.Value))))"
+                   min="@GetMin(Key)" max="@GetMax(Key)" />
+            break;
+        case "double":
+            <input type="number" step="0.01" class="form-control form-control-sm" 
+                   value="@Convert.ToDouble(Value)" 
+                   @onchange="((e) => OnChanged.InvokeAsync((Key, Convert.ToDouble(e.Value))))"
+                   min="@GetMin(Key)" max="@GetMax(Key)" step="0.01" />
+            break;
+        case "bool":
+            <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input" 
+                       checked="@Convert.ToBoolean(Value)" 
+                       @onchange="((e) => OnChanged.InvokeAsync((Key, Convert.ToBoolean(e.Value))))" />
+            </div>
+            break;
+        case "enum":
+            <select class="form-select form-select-sm" 
+                    value="@Value?.ToString()" 
+                    @onchange="((e) => OnChanged.InvokeAsync((Key, e.Value?.ToString() ?? "")))">
+                @foreach (var enumVal in GetEnumValues(Key))
+                {
+                    <option value="@enumVal" selected="@(Value?.ToString() == enumVal)">@enumVal</option>
+                }
+            </select>
+            break;
+        default:
+            <input type="text" class="form-control form-control-sm" 
+                   value="@Value?.ToString()" 
+                   @onchange="((e) => OnChanged.InvokeAsync((Key, e.Value?.ToString() ?? "")))" />
+            break;
+    }
+    
+    @if (!string.IsNullOrEmpty(GetDescription(Key)))
+    {
+        <div class="form-text small">@GetDescription(Key)</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Key { get; set; } = "";
+    [Parameter] public object? Value { get; set; }
+    [Parameter] public string NodeType { get; set; } = "";
+    [Parameter] public EventCallback<(string Key, object Value)> OnChanged { get; set; }
+
+    private string GetDisplayName(string key) => key switch
+    {
+        "durationMs" => "Duration (ms)",
+        "threshold" => "Confidence Threshold",
+        "type" => "Type",
+        "x" => "X Coordinate",
+        "y" => "Y Coordinate",
+        "endX" => "End X",
+        "endY" => "End Y",
+        "text" => "Text",
+        "durationMs" => "Duration (ms)",
+        "keyCode" => "Key Code",
+        "templateName" => "Template Name",
+        "condition" => "Condition Expression",
+        "timeoutMs" => "Timeout (ms)",
+        "pollIntervalMs" => "Poll Interval (ms)",
+        "count" => "Loop Count",
+        "loopType" => "Loop Type",
+        "whileCondition" => "While Condition",
+        "forEachVar" => "ForEach Variable",
+        "iteratorVariable" => "Iterator Variable",
+        "maxDurationMs" => "Max Duration (ms)",
+        "scenarioId" => "Scenario ID",
+        "parameters" => "Parameters",
+        "returnVariable" => "Return Variable",
+        "name" => "Variable Name",
+        "value" => "Value",
+        "expression" => "Expression",
+        "region" => "Region",
+        "format" => "Format",
+        "quality" => "Quality",
+        "saveAs" => "Save As",
+        _ => key
+    };
+
+    private string GetDescription(string key) => key switch
+    {
+        "durationMs" => "Delay duration in milliseconds",
+        "threshold" => "Minimum confidence threshold (0-1)",
+        "threshold" => "Template matching threshold (0-1)",
+        "timeoutMs" => "Maximum time to wait in milliseconds",
+        "pollIntervalMs" => "How often to check condition in milliseconds",
+        "count" => "Number of loop iterations",
+        "loopType" => "Loop type: count, while, foreach, until",
+        "whileCondition" => "CEL expression for while/until loops",
+        "forEachVar" => "Variable containing array to iterate",
+        "iteratorVariable" => "Name of loop variable",
+        "maxDurationMs" => "Safety timeout for loops",
+        "templateName" => "Name of template to match",
+        "condition" => "CEL expression or variable name",
+        "expression" => "CEL expression for variable value",
+        "region" => "Screen region (x, y, width, height)",
+        "format" => "Image format: png, jpg",
+        "quality" => "Image quality 1-100",
+        "saveAs" => "Variable name to store frame data",
+        _ => ""
+    };
+
+    private string GetPlaceholder(string key) => key switch
+    {
+        "name" => "variable_name",
+        "value" => "value",
+        "expression" => "variable > 10",
+        "condition" => "variable_name or CEL expression",
+        "templateName" => "health_bar",
+        "scenarioId" => "sub-scenario-id",
+        "parameters" => '{"key": "value"}',
+        _ => ""
+    };
+
+    private string GetValueType(string key, object? value)
+    {
+        if (value == null) return "string";
+        return value switch
+        {
+            string _ => "string",
+            int _ => "int",
+            double _ => "double",
+            float _ => "double",
+            bool _ => "bool",
+            Enum _ => "enum",
+            _ => "string"
+        };
+    }
+
+    private int GetMin(string key) => key switch
+    {
+        "durationMs" => 0,
+        "threshold" => 0,
+        "count" => 1,
+        "timeoutMs" => 0,
+        "pollIntervalMs" => 10,
+        "quality" => 1,
+        _ => int.MinValue
+    };
+
+    private int GetMax(string key) => key switch
+    {
+        "threshold" => 1,
+        "quality" => 100,
+        _ => int.MaxValue
+    };
+
+    private IEnumerable<string> GetEnumValues(string key) => key switch
+    {
+        "type" when NodeType == "input" => new[] { "tap", "swipe", "text", "key" },
+        "type" when NodeType == "loop" => new[] { "count", "while", "forEach", "until" },
+        "format" => new[] { "png", "jpg" },
+        "loopType" => new[] { "count", "while", "forEach", "until" },
+        _ => Array.Empty<string>()
+    };
+}

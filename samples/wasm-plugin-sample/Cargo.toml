@@ -1,0 +1,23 @@
+[package]
+name = "kkbot-plugin-sample"
+version = "1.0.0"
+edition = "2021"
+description = "Sample KKBOT WASM plugin written in Rust"
+
+[lib]
+crate-type = ["cdylib"]
+name = "kkbot_plugin_sample"
+
+[dependencies]
+kkbot-wasm = { path = "../../crates/kkbot-wasm" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wasm-bindgen = "0.2"
+once_cell = "1.19"
+lazy_static = "1.4"
+
+[profile.release]
+opt-level = "z"
+lto = true
+panic = "abort"
+strip = true

@@ -20,68 +20,54 @@ using KKBOT.VisualScripting;
 using KKBOT.Analytics;
 using KKBOT.Collaboration;
 using KKBOT.Enterprise;
+using KKBOT.Device.Simulator;
+using KKBOT.Device.Abstractions;
+using KKBOT.Perception.Abstractions;
+using KKBOT.UI.Dashboard.Services;
 using MudBlazor.Services;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Serilog
 builder.Host.UseKkbotTelemetry();
 
-// Services
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddMudServices();
 
-// Persistence
 builder.Services.AddKkbotPersistence(builder.Configuration);
-
-// Security
 builder.Services.AddKkbotSecurity(builder.Configuration);
-
-// Identity & Authentication
 builder.Services.AddKkbotIdentity(builder.Configuration);
-
-// Plugin Marketplace
 builder.Services.AddKkbotPluginMarketplace(builder.Configuration);
-
-// AI Pipeline
 builder.Services.AddKkbotAIPipeline(builder.Configuration);
-
-// Analytics
 builder.Services.AddKkbotAnalytics(builder.Configuration);
-
-// Collaboration
 builder.Services.AddKkbotCollaboration(builder.Configuration);
-
-// Enterprise
 builder.Services.AddKkbotEnterprise(builder.Configuration);
-
-// Visual Scripting
 builder.Services.AddKkbotVisualScripting(builder.Configuration);
 
-// Orchestration
 builder.Services.AddSingleton<EventStore>();
 builder.Services.AddSingleton<DagScheduler>();
 builder.Services.AddSingleton<PluginLoader>();
 builder.Services.AddSingleton<InstanceOrchestrator>();
 
-// Application (MediatR, etc.)
-builder.Services.AddKkbotApplication();
+builder.Services.AddSingleton<IDeviceSessionFactory, KKBOT.Device.Simulator.SimulatedDeviceSessionFactory>();
+builder.Services.AddSingleton<IPerceptionPipeline, KKBOT.Perception.Abstractions.PerceptionPipeline>();
 
-// Health checks
+builder.Services.AddScoped<IScenarioService, ScenarioService>();
+builder.Services.AddScoped<ScenarioParser>();
+builder.Services.AddScoped<ScenarioRunner>();
+
+builder.Services.AddKkbotApplication();
 builder.Services.AddKkbotHealthChecks();
 
 var app = builder.Build();
 
-// Ensure database created
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<KkbotDbContext>();
     db.Database.EnsureCreated();
 }
 
-// Pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -93,7 +79,6 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseSerilogRequestLogging();
 
-// Tenant resolution middleware
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.UseAuthentication();

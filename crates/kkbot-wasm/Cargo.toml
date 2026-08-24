@@ -1,0 +1,23 @@
+[package]
+name = "kkbot-wasm"
+version = "1.0.0"
+edition = "2021"
+description = "KKBOT WASM SDK for writing game automation plugins in Rust"
+license = "MIT"
+repository = "https://github.com/your-org/kkbot"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "kkbot_wasm"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+wasm-bindgen = "0.2"
+bitflags = "2.0"
+once_cell = "1.19"
+lazy_static = "1.4"
+
+[features]
+default = ["std"]
+std = []

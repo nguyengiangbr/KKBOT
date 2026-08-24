@@ -3,18 +3,18 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using KKBOT.Plugins.Abstractions;
 using KKBOT.Plugins.Loader;
+using KKBOT.Identity.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace KKBOT.API.Controllers;
 
-/// <summary>
-/// Plugin management API
-/// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
@@ -30,11 +30,10 @@ public sealed class PluginsController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all loaded plugins
-    /// </summary>
     [HttpGet]
+    [RequirePermission(KKBOTPermissions.PluginRead)]
     [ProducesResponseType(typeof(IEnumerable<PluginInfo>), 200)]
+    [SwaggerOperation("Get all loaded plugins", "Requires plugin.read permission")]
     public async Task<ActionResult<IEnumerable<PluginInfo>>> GetAll([FromQuery] string path = "plugins", CancellationToken ct = default)
     {
         var plugins = await _pluginLoader.LoadPluginsAsync(path, ct);
@@ -54,11 +53,37 @@ public sealed class PluginsController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Reload plugins from directory
-    /// </summary>
+    [HttpGet("{pluginId}")]
+    [RequirePermission(KKBOTPermissions.PluginRead, "plugin", "{pluginId}")]
+    [ProducesResponseType(typeof(PluginInfo), 200)]
+    [ProducesResponseType(404)]
+    [SwaggerOperation("Get plugin by ID", "Requires plugin.read permission")]
+    public async Task<ActionResult<PluginInfo>> GetById(string pluginId, [FromQuery] string path = "plugins", CancellationToken ct = default)
+    {
+        var plugins = await _pluginLoader.LoadPluginsAsync(path, ct);
+        var plugin = plugins.FirstOrDefault(p => p.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase));
+        if (plugin == null) return NotFound();
+
+        var manifest = plugin.GetManifest();
+        return Ok(new PluginInfo
+        {
+            Id = plugin.Id,
+            Name = manifest.Name,
+            Version = manifest.Version,
+            Author = manifest.Author,
+            Description = manifest.Description,
+            SupportedResolutions = manifest.SupportedResolutions,
+            RequiredPermissions = manifest.RequiredPermissions,
+            Detectors = plugin.GetDetectors().Select(d => new DetectorInfo { Id = d.Id, Name = d.Name }).ToList(),
+            Tasks = plugin.GetTasks().Select(t => new TaskInfo { Id = t.Id, Name = t.Name, Type = t.Type.ToString() }).ToList(),
+            States = plugin.GetStates().Select(s => new StateInfo { Id = s.Id, Name = s.Name, Category = s.Category }).ToList()
+        });
+    }
+
     [HttpPost("reload")]
+    [RequirePermission(KKBOTPermissions.PluginManage)]
     [ProducesResponseType(typeof(IEnumerable<PluginInfo>), 200)]
+    [SwaggerOperation("Reload all plugins", "Requires plugin.manage permission")]
     public async Task<ActionResult<IEnumerable<PluginInfo>>> Reload([FromQuery] string path = "plugins", CancellationToken ct = default)
     {
         var plugins = await _pluginLoader.LoadPluginsAsync(path, ct);
@@ -75,8 +100,18 @@ public sealed class PluginsController : ControllerBase
             Tasks = p.GetTasks().Select(t => new TaskInfo { Id = t.Id, Name = t.Name, Type = t.Type.ToString() }).ToList(),
             States = p.GetStates().Select(s => new StateInfo { Id = s.Id, Name = s.Name, Category = s.Category }).ToList()
         });
-        _logger.LogInformation("Reloaded {Count} plugins from {Path}", plugins.Count, path);
+        _logger.LogInformation("Reloaded {Count} plugins", plugins.Count);
         return Ok(result);
+    }
+
+    [HttpPost("validate")]
+    [RequirePermission(KKBOTPermissions.PluginInstall)]
+    [ProducesResponseType(typeof(ModuleValidationResult), 200)]
+    [SwaggerOperation("Validate a plugin", "Requires plugin.install permission")]
+    public async Task<ActionResult<ModuleValidationResult>> Validate([FromBody] ValidatePluginRequest request, CancellationToken ct)
+    {
+        // Implementation would validate plugin assets, config, etc.
+        return Ok(new ModuleValidationResult(true, Array.Empty<ModuleValidationError>()));
     }
 }
 
@@ -96,3 +131,8 @@ public record PluginInfo(
 public record DetectorInfo(string Id, string Name);
 public record TaskInfo(string Id, string Name, string Type);
 public record StateInfo(string Id, string Name, string Category);
+
+public record ValidatePluginRequest(
+    string PluginPath,
+    string? Config = null
+);

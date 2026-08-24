@@ -1,0 +1,616 @@
+@page "/network/proxy"
+@inject INetworkProxyService ProxyService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ILogger<ProxyConfigPage> Logger
+
+<PageTitle>Proxy Configuration</PageTitle>
+
+<div class="proxy-config-page">
+    <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">Proxy Configuration</h1>
+            <p class="text-muted mb-0">Manage proxy pools, per-instance binding, and network isolation</p>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateProxyPoolDialog" StartIcon="@Icons.Material.Filled.Add">
+            New Proxy Pool
+        </MudButton>
+    </div>
+
+    <!-- Proxy Pools Section -->
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Proxy Pools</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudTextField @bind-Value="poolSearchString" Placeholder="Search pools..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Class="w-auto" />
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (isLoadingPools)
+            {
+                <MudProgressCircular Indeterminate="true" Class="mx-auto" />
+            }
+            else
+            {
+                <MudTable Items="@filteredPools" Hover="true" Striped="true" Dense="true" Filter="FilterPools" @bind-SortDirection="@sortDirection" @bind-SortLabel="@sortLabel">
+                    <ToolBarContent>
+                        <MudTextField @bind-Value="poolSearchString" Placeholder="Search pools..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Class="w-100" />
+                    </ToolBarContent>
+                    <Columns>
+                        <Column T="ProxyPoolConfig" Field="@nameof(ProxyPoolConfig.Name)" Title="Name" Sortable="true" />
+                        <Column T="ProxyPoolConfig" Field="@nameof(ProxyPoolConfig.PoolId)" Title="Pool ID" Sortable="true">
+                            <CellTemplate>
+                                <span class="font-monospace small">@context.PoolId</span>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="ProxyPoolConfig" Field="@nameof(ProxyPoolConfig.Proxies)" Title="Proxies" Sortable="true">
+                            <CellTemplate>
+                                <span class="badge bg-info">@context.Proxies.Count</span>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="ProxyPoolConfig" Field="@nameof(ProxyPoolConfig.RotationStrategy)" Title="Rotation" Sortable="true" />
+                        <Column T="ProxyPoolConfig" Field="@nameof(ProxyPoolConfig.HealthCheckIntervalSeconds)" Title="Health Check (s)" Sortable="true" />
+                        <Column T="ProxyPoolConfig" Field="@nameof(ProxyPoolConfig.AutoFailover)" Title="Auto Failover" Sortable="true">
+                            <CellTemplate>
+                                <MudSwitch @bind-Checked="@context.AutoFailover" Color="Color.Primary" Size="Size.Small" />
+                            </CellTemplate>
+                        </Column>
+                        <Column T="ProxyPoolConfig" Title="Actions">
+                            <CellTemplate>
+                                <div class="btn-group btn-group-sm">
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => EditProxyPool(context))" Icon="@Icons.Material.Filled.Edit" Title="Edit" />
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => ManageProxies(context))" Icon="@Icons.Material.Filled.List" Title="Manage Proxies" />
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteProxyPool(context.PoolId))" Icon="@Icons.Material.Filled.Delete" Title="Delete" />
+                                </div>
+                            </CellTemplate>
+                        </Column>
+                    </Columns>
+                </MudTable>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Instance Proxy Bindings -->
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Instance Proxy Bindings</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="BindProxyDialog" StartIcon="@Icons.Material.Filled.Link">
+                    Bind Proxy
+                </MudButton>
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (isLoadingBindings)
+            {
+                <MudProgressCircular Indeterminate="true" Class="mx-auto" />
+            }
+            else if (bindings.Count == 0)
+            {
+                <div class="text-center py-4">
+                    <MudIcon Icon="@Icons.Material.Filled.LinkOff" Size="Size.Large" Class="text-muted" />
+                    <p class="mt-2 text-muted">No active proxy bindings</p>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="BindProxyDialog" Class="mt-2">
+                        Bind First Proxy
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <MudTable Items="@bindings" Hover="true" Striped="true" Dense="true" Filter="FilterBindings" @bind-SortDirection="@sortDirection" @bind-SortLabel="@sortLabel">
+                    <Columns>
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.InstanceId)" Title="Instance ID" Sortable="true" />
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.InstanceName)" Title="Instance Name" Sortable="true" />
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.ProxyId)" Title="Proxy ID" Sortable="true" />
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.ProxyHost)" Title="Proxy Host" Sortable="true" />
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.ProxyPort)" Title="Port" Sortable="true" />
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.Status)" Title="Status" Sortable="true">
+                            <CellTemplate>
+                                <MudChip Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="InstanceProxyBinding" Field="@nameof(InstanceProxyBinding.BoundAt)" Title="Bound At" Sortable="true">
+                            <CellTemplate>
+                                <span class="small">@context.BoundAt.ToLocalTime().ToString("g")</span>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="InstanceProxyBinding" Title="Actions">
+                            <CellTemplate>
+                                <div class="btn-group btn-group-sm">
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => RotateProxy(context.InstanceId))" Icon="@Icons.Material.Filled.Refresh" Title="Rotate" Color="Color.Info" />
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => UnbindProxy(context.InstanceId))" Icon="@Icons.Material.Filled.Unlink" Title="Unbind" Color="Color.Error" />
+                                </div>
+                            </CellTemplate>
+                        </Column>
+                    </Columns>
+                </MudTable>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Network Isolation -->
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Network Isolation</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudSwitch @bind-Checked="@enableNetworkIsolation" Label="Enable Network Isolation" Color="Color.Primary" />
+            
+            @if (enableNetworkIsolation)
+            {
+                <MudGrid Class="mt-4">
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="IsolationMode" @bind-Value="defaultIsolationMode" Label="Default Isolation Mode" Variant="Variant.Outlined">
+                            <MudSelectItem Value="@IsolationMode.ProxyOnly">Proxy Only</MudSelectItem>
+                            <MudSelectItem Value="@IsolationMode.NetworkNamespace">Network Namespace (Linux)</MudSelectItem>
+                            <MudSelectItem Value="@IsolationMode.VPN">VPN Tunnel</MudSelectItem>
+                            <MudSelectItem Value="@IsolationMode.Custom">Custom Rules</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="@blockWebRTC" Label="Block WebRTC" Color="Color.Secondary" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="@blockDirectSockets" Label="Block Direct Sockets" Color="Color.Secondary" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="@forceProxyForAllTraffic" Label="Force Proxy for All Traffic" Color="Color.Secondary" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudExpansionPanels Class="mt-4">
+                    @foreach (var isolation in isolationConfigs)
+                    {
+                        <MudExpansionPanel Text="@($"Instance: {isolation.InstanceId}")" Expanded="@false">
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudSelect T="IsolationMode" @bind-Value="isolation.Mode" Label="Isolation Mode" Variant="Variant.Outlined">
+                                        <MudSelectItem Value="@IsolationMode.ProxyOnly">Proxy Only</MudSelectItem>
+                                        <MudSelectItem Value="@IsolationMode.NetworkNamespace">Network Namespace</MudSelectItem>
+                                        <MudSelectItem Value="@IsolationMode.VPN">VPN Tunnel</MudSelectItem>
+                                        <MudSelectItem Value="@IsolationMode.Custom">Custom</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="isolation.NetworkNamespace" Label="Network Namespace" HelperText="Custom namespace name (optional)" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudSwitch @bind-Checked="isolation.BlockWebRTC" Label="Block WebRTC" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudSwitch @bind-Checked="isolation.BlockDirectSockets" Label="Block Direct Sockets" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudSwitch @bind-Checked="isolation.ForceProxyForAllTraffic" Label="Force Proxy for All Traffic" />
+                                </MudItem>
+                                <MudItem xs="12" md="12">
+                                    <MudTextField @bind-Value="newAllowedDestination" Label="Allowed Destination (CIDR or domain)" Placeholder="e.g., 10.0.0.0/8 or *.example.com" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Add" OnKeyDown="@(e => { if (e.Key == "Enter") AddAllowedDestination(isolation); })" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    @foreach (var dest in isolation.AllowedDestinations)
+                                    {
+                                        <MudChip Class="me-1 mb-1" Color="Color.Success" OnClose="@(() => isolation.AllowedDestinations.Remove(dest))" CloseIcon="@Icons.Material.Filled.Close">@dest</MudChip>
+                                    }
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="newBlockedDestination" Label="Blocked Destination (CIDR or domain)" Placeholder="e.g., 192.168.1.0/24 or bad-site.com" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Block" OnKeyDown="@(e => { if (e.Key == "Enter") AddBlockedDestination(isolation); })" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    @foreach (var dest in isolation.BlockedDestinations)
+                                    {
+                                        <MudChip Class="me-1 mb-1" Color="Color.Error" OnClose="@(() => isolation.BlockedDestinations.Remove(dest))" CloseIcon="@Icons.Material.Filled.Close">@dest</MudChip>
+                                    }
+                                </MudItem>
+                            </MudGrid>
+                        </MudExpansionPanel>
+                    }
+                </MudExpansionPanels>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Proxy Health Monitoring -->
+    <MudCard>
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Proxy Health Monitoring</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (isLoadingHealth)
+            {
+                <MudProgressCircular Indeterminate="true" Class="mx-auto" />
+            }
+            else
+            {
+                <MudTable Items="@proxyHealth" Hover="true" Striped="true" Dense="true">
+                    <Columns>
+                        <Column T="ProxyHealth" Field="@nameof(ProxyHealth.ProxyId)" Title="Proxy ID" Sortable="true" />
+                        <Column T="ProxyHealth" Title="Status" Sortable="true">
+                            <CellTemplate>
+                                <MudChip Color="@(context.IsHealthy ? Color.Success : Color.Error)" Size="Size.Small">
+                                    @(context.IsHealthy ? "Healthy" : "Unhealthy")
+                                </MudChip>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="ProxyHealth" Field="@nameof(ProxyHealth.AverageLatencyMs)" Title="Avg Latency (ms)" Sortable="true" />
+                        <Column T="ProxyHealth" Field="@nameof(ProxyHealth.ConsecutiveFailures)" Title="Failures" Sortable="true" />
+                        <Column T="ProxyHealth" Field="@nameof(ProxyHealth.ConsecutiveSuccesses)" Title="Successes" Sortable="true" />
+                        <Column T="ProxyHealth" Field="@nameof(ProxyHealth.ActiveConnections)" Title="Active Connections" Sortable="true" />
+                        <Column T="ProxyHealth" Field="@nameof(ProxyHealth.LastCheck)" Title="Last Check" Sortable="true">
+                            <CellTemplate>
+                                <span class="small">@context.LastCheck.ToLocalTime().ToString("g")</span>
+                            </CellTemplate>
+                        </Column>
+                        <Column T="ProxyHealth" Title="Actions">
+                            <CellTemplate>
+                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => TriggerRotation(context.ProxyId))" Icon="@Icons.Material.Filled.Refresh" Title="Force Rotation" Color="Color.Warning" />
+                            </CellTemplate>
+                        </Column>
+                    </Columns>
+                </MudTable>
+            }
+        </MudCardContent>
+    </MudCard>
+</div>
+
+@code {
+    // Services
+    [Inject] INetworkProxyService ProxyService { get; set; } = null!;
+    [Inject] IDialogService DialogService { get; set; } = null!;
+    [Inject] ISnackbar Snackbar { get; set; } = null!;
+    [Inject] ILogger<ProxyConfigPage> Logger { get; set; } = null!;
+
+    // State
+    private List<ProxyPoolConfig> proxyPools = new();
+    private List<InstanceProxyBinding> bindings = new();
+    private List<ProxyHealth> proxyHealth = new();
+    private List<NetworkIsolationConfig> isolationConfigs = new();
+    
+    private bool isLoadingPools = true;
+    private bool isLoadingBindings = true;
+    private bool isLoadingHealth = true;
+    private bool isLoadingIsolation = true;
+    
+    private string poolSearchString = "";
+    private string sortLabel = "Name";
+    private SortDirection sortDirection = SortDirection.Ascending;
+    private string poolSearchString = "";
+    private string bindingSearchString = "";
+    
+    // Network Isolation
+    private bool enableNetworkIsolation = false;
+    private IsolationMode defaultIsolationMode = IsolationMode.ProxyOnly;
+    private bool blockWebRTC = true;
+    private bool blockDirectSockets = true;
+    private bool forceProxyForAllTraffic = true;
+    private Dictionary<string, NetworkIsolationConfig> isolationConfigsDict = new();
+    private List<NetworkIsolationConfig> isolationConfigs = new();
+    
+    private string newAllowedDestination = "";
+    private string newBlockedDestination = "";
+    private string poolSearchString = "";
+    private string bindingSearchString = "";
+    private SortDirection sortDirection = SortDirection.Ascending;
+    private string sortLabel = "Name";
+    private bool isLoadingPools = true;
+    private bool isLoadingBindings = true;
+    private bool isLoadingHealth = true;
+    private bool isLoadingIsolation = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoadingPools = true;
+        isLoadingBindings = true;
+        isLoadingHealth = true;
+        isLoadingIsolation = true;
+
+        try
+        {
+            var poolsTask = ProxyService.GetProxyPoolsAsync();
+            var bindingsTask = ProxyService.GetInstanceBindingsAsync();
+            var healthTask = ProxyService.GetProxyHealthAsync();
+            var isolationTask = ProxyService.GetIsolationConfigsAsync();
+
+            await Task.WhenAll(poolsTask, bindingsTask, healthTask, isolationTask);
+
+            proxyPools = (await poolsTask).ToList();
+            bindings = (await bindingsTask).ToList();
+            proxyHealth = (await healthTask).ToList();
+            isolationConfigs = (await isolationTask).ToList();
+            
+            // Initialize isolation configs dict
+            isolationConfigsDict = isolationConfigs.ToDictionary(x => x.InstanceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load proxy configuration");
+            Snackbar.Add("Failed to load proxy configuration", Severity.Error);
+        }
+        finally
+        {
+            isLoadingPools = false;
+            isLoadingBindings = false;
+            isLoadingHealth = false;
+            isLoadingIsolation = false;
+        }
+    }
+
+    private bool FilterPools(ProxyPoolConfig pool)
+    {
+        if (string.IsNullOrWhiteSpace(poolSearchString)) return true;
+        return pool.Name.Contains(poolSearchString, StringComparison.OrdinalIgnoreCase) ||
+               pool.PoolId.Contains(poolSearchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool FilterBindings(InstanceProxyBinding binding)
+    {
+        if (string.IsNullOrWhiteSpace(bindingSearchString)) return true;
+        return binding.InstanceId.Contains(bindingSearchString, StringComparison.OrdinalIgnoreCase) ||
+               binding.InstanceName.Contains(bindingSearchString, StringComparison.OrdinalIgnoreCase) ||
+               binding.ProxyId.Contains(bindingSearchString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Active" => Color.Success,
+            "Connecting" => Color.Warning,
+            "Disconnected" => Color.Error,
+            "Error" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    // Dialog Actions
+    private async Task CreateProxyPoolDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Pool"] = new ProxyPoolConfig()
+        };
+
+        var dialog = await DialogService.Show<ProxyPoolDialog>("Create Proxy Pool", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is ProxyPoolConfig newPool)
+        {
+            var result = await ProxyService.CreateProxyPoolAsync(newPool);
+            if (result.Success)
+            {
+                Snackbar.Add("Proxy pool created successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Failed to create pool: {result.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task EditProxyPool(ProxyPoolConfig pool)
+    {
+        var parameters = new DialogParameters
+        {
+            ["Pool"] = pool
+        };
+
+        var dialog = await DialogService.Show<ProxyPoolDialog>("Edit Proxy Pool", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is ProxyPoolConfig updatedPool)
+        {
+            var result = await ProxyService.UpdateProxyPoolAsync(updatedPool);
+            if (result.Success)
+            {
+                Snackbar.Add("Proxy pool updated successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Failed to update pool: {result.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ManageProxies(ProxyPoolConfig pool)
+    {
+        var parameters = new DialogParameters
+        {
+            ["PoolId"] = pool.PoolId,
+            ["PoolName"] = pool.Name
+        };
+
+        var dialog = await DialogService.Show<ProxyManagementDialog>("Manage Proxies", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task DeleteProxyPool(string poolId)
+    {
+        var confirmed = await DialogService.ShowMessageBox("Delete Proxy Pool", 
+            "Are you sure you want to delete this proxy pool? This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            var result = await ProxyService.DeleteProxyPoolAsync(poolId);
+            if (result)
+            {
+                Snackbar.Add("Proxy pool deleted", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete proxy pool", Severity.Error);
+            }
+        }
+    }
+
+    private async Task BindProxyDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["AvailableProxies"] = proxyPools.SelectMany(p => p.Proxies).ToList(),
+            ["Instances"] = await ProxyService.GetAvailableInstancesAsync()
+        };
+
+        var dialog = await DialogService.Show<BindProxyDialog>("Bind Proxy to Instance", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is BindProxyRequest request)
+        {
+            var result = await ProxyService.BindProxyAsync(request.InstanceId, request.ProxyId);
+            if (result.Success)
+            {
+                Snackbar.Add("Proxy bound successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Failed to bind proxy: {result.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task UnbindProxy(string instanceId)
+    {
+        var confirmed = await DialogService.ShowMessageBox("Unbind Proxy", 
+            $"Are you sure you want to unbind proxy from instance {instanceId}?",
+            yesText: "Unbind", cancelText: "Cancel");
+
+        if (confirmed == true)
+        {
+            var result = await ProxyService.UnbindProxyAsync(instanceId);
+            if (result.Success)
+            {
+                Snackbar.Add("Proxy unbound successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add($"Failed to unbind proxy: {result.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RotateProxy(string instanceId)
+    {
+        var result = await ProxyService.RotateInstanceProxyAsync(instanceId);
+        if (result.Success)
+        {
+            Snackbar.Add($"Proxy rotated for instance {instanceId}", Severity.Success);
+            await LoadDataAsync();
+        }
+        else
+        {
+            Snackbar.Add($"Failed to rotate proxy: {result.Message}", Severity.Error);
+        }
+    }
+
+    private async Task TriggerRotation(string proxyId)
+    {
+        var result = await ProxyService.TriggerRotationAsync(proxyId, RotationReason.ManualTrigger);
+        if (result.Success)
+        {
+            Snackbar.Add($"Proxy rotation triggered", Severity.Success);
+            await LoadDataAsync();
+        }
+        else
+        {
+            Snackbar.Add($"Failed to trigger rotation: {result.Message}", Severity.Error);
+        }
+    }
+
+    private void AddAllowedDestination(NetworkIsolationConfig isolation)
+    {
+        if (!string.IsNullOrWhiteSpace(newAllowedDestination) && !isolation.AllowedDestinations.Contains(newAllowedDestination))
+        {
+            isolation.AllowedDestinations.Add(newAllowedDestination);
+            newAllowedDestination = "";
+        }
+    }
+
+    private void AddBlockedDestination(NetworkIsolationConfig isolation)
+    {
+        if (!string.IsNullOrWhiteSpace(newBlockedDestination) && !isolation.BlockedDestinations.Contains(newBlockedDestination))
+        {
+            isolation.BlockedDestinations.Add(newBlockedDestination);
+            newBlockedDestination = "";
+        }
+    }
+
+    private async Task TriggerRotation(string proxyId)
+    {
+        var result = await ProxyService.TriggerRotationAsync(proxyId, RotationReason.ManualTrigger);
+        if (result.Success)
+        {
+            Snackbar.Add("Proxy rotation triggered", Severity.Success);
+            await LoadDataAsync();
+        }
+        else
+        {
+            Snackbar.Add($"Failed to trigger rotation: {result.Message}", Severity.Error);
+        }
+    }
+}
+
+// Dialog Components (simplified)
+public partial class ProxyPoolDialog : ComponentBase
+{
+    [Parameter] public ProxyPoolConfig Pool { get; set; } = new();
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(Pool));
+    private void Cancel() => MudDialog.Cancel();
+}
+
+public partial class ProxyManagementDialog : ComponentBase
+{
+    [Parameter] public string PoolId { get; set; } = "";
+    [Parameter] public string PoolName { get; set; } = "";
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    // Implementation would include proxy list, add/edit/delete proxy dialogs
+}
+
+public partial class BindProxyDialog : ComponentBase
+{
+    [Parameter] public List<ProxyConfig> AvailableProxies { get; set; } = new();
+    [Parameter] public List<InstanceInfo> Instances { get; set; } = new();
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    private BindProxyRequest Request { get; set; } = new();
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(Request));
+    private void Cancel() => MudDialog.Cancel();
+}
+
+// Data Models
+public record InstanceProxyBinding(
+    string InstanceId,
+    string InstanceName,
+    string ProxyId,
+    string ProxyHost,
+    int ProxyPort,
+    string Status,
+    DateTimeOffset BoundAt
+);
+
+public record InstanceInfo(string InstanceId, string Name, string Status);
+public record BindProxyRequest(string InstanceId, string ProxyId);

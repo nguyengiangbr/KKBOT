@@ -6,4 +6,9 @@ namespace KKBOT.AI.Abstractions;
 public interface IAiVisionService
 {
     Task<AiResponse> GenerateAsync(byte[] imageData, string prompt, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Generates a streaming response from the AI vision model.
+    /// </summary>
+    IAsyncEnumerable<AiStreamChunk> GenerateStreamAsync(byte[] imageData, string prompt, CancellationToken cancellationToken);
 }

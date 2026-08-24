@@ -3,18 +3,18 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using KKBOT.Domain.Models;
 using KKBOT.Persistence.Abstractions;
+using KKBOT.Identity.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace KKBOT.API.Controllers;
 
-/// <summary>
-/// Job management API
-/// </summary>
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
@@ -32,11 +32,10 @@ public sealed class JobsController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Get all jobs (optionally filtered by instance)
-    /// </summary>
     [HttpGet]
+    [RequirePermission(KKBOTPermissions.JobRead)]
     [ProducesResponseType(typeof(IEnumerable<Job>), 200)]
+    [SwaggerOperation("Get all jobs", "Requires job.read permission")]
     public async Task<ActionResult<IEnumerable<Job>>> GetAll([FromQuery] Guid? instanceId, CancellationToken ct)
     {
         if (instanceId.HasValue)
@@ -45,7 +44,6 @@ public sealed class JobsController : ControllerBase
             return Ok(jobs);
         }
 
-        // Get all jobs across all instances
         var instances = await _instanceRepository.GetAllAsync(ct);
         var allJobs = new List<Job>();
         foreach (var inst in instances)
@@ -56,44 +54,43 @@ public sealed class JobsController : ControllerBase
         return Ok(allJobs.OrderByDescending(j => j.CreatedAt));
     }
 
-    /// <summary>
-    /// Get job by ID
-    /// </summary>
     [HttpGet("{id:guid}")]
+    [RequirePermission(KKBOTPermissions.JobRead, "job", "{id}")]
     [ProducesResponseType(typeof(Job), 200)]
     [ProducesResponseType(404)]
+    [SwaggerOperation("Get job by ID", "Requires job.read permission")]
     public async Task<ActionResult<Job>> GetById(Guid id, CancellationToken ct)
     {
         var job = await _repository.GetAsync(id, ct);
         return job is null ? NotFound() : Ok(job);
     }
 
-    /// <summary>
-    /// Create a new job
-    /// </summary>
     [HttpPost]
+    [RequirePermission(KKBOTPermissions.JobWrite)]
     [ProducesResponseType(typeof(Job), 201)]
     [ProducesResponseType(400)]
+    [SwaggerOperation("Create a new job", "Requires job.write permission")]
     public async Task<ActionResult<Job>> Create([FromBody] CreateJobRequest request, CancellationToken ct)
     {
-        var job = new Job(Guid.NewGuid(), request.InstanceId, request.Type, JobStatus.Pending, request.Payload ?? "{}")
+        var job = new Job(Guid.NewGuid(), request.Name, request.ModuleId, request.TaskId)
         {
+            Parameters = request.Parameters ?? "{}",
             Priority = request.Priority,
-            ScheduledAt = request.ScheduledAt
+            MaxConcurrency = request.MaxConcurrency,
+            Timeout = request.Timeout
         };
 
         await _repository.AddAsync(job, ct);
-        _logger.LogInformation("Created job {JobId} for instance {InstanceId}", job.Id, request.InstanceId);
+        _logger.LogInformation("Created job {JobId} ({Name})", job.Id, job.Name);
         return CreatedAtAction(nameof(GetById), new { id = job.Id }, job);
     }
 
-    /// <summary>
-    /// Update a job
-    /// </summary>
     [HttpPut("{id:guid}")]
+    [RequirePermission(KKBOTPermissions.JobWrite, "job", "{id}")]
     [ProducesResponseType(typeof(Job), 200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(400)]
+    [SwaggerOperation("Update a job", "Requires job.write permission")]
     public async Task<ActionResult<Job>> Update(Guid id, [FromBody] UpdateJobRequest request, CancellationToken ct)
     {
         var job = await _repository.GetAsync(id, ct);
@@ -101,13 +98,12 @@ public sealed class JobsController : ControllerBase
 
         job = job with
         {
-            Status = request.Status ?? job.Status,
+            Name = request.Name ?? job.Name,
+            TaskId = request.TaskId ?? job.TaskId,
+            Parameters = request.Parameters ?? job.Parameters,
             Priority = request.Priority ?? job.Priority,
-            Payload = request.Payload ?? job.Payload,
-            Result = request.Result ?? job.Result,
-            ErrorMessage = request.ErrorMessage ?? job.ErrorMessage,
-            StartedAt = request.StartedAt ?? job.StartedAt,
-            CompletedAt = request.CompletedAt ?? job.CompletedAt,
+            MaxConcurrency = request.MaxConcurrency ?? job.MaxConcurrency,
+            Timeout = request.Timeout ?? job.Timeout,
             UpdatedAt = DateTime.UtcNow
         };
 
@@ -116,12 +112,11 @@ public sealed class JobsController : ControllerBase
         return Ok(job);
     }
 
-    /// <summary>
-    /// Delete a job
-    /// </summary>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(KKBOTPermissions.JobCancel, "job", "{id}")]
     [ProducesResponseType(204)]
     [ProducesResponseType(404)]
+    [SwaggerOperation("Delete a job", "Requires job.cancel permission")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var job = await _repository.GetAsync(id, ct);
@@ -131,22 +126,60 @@ public sealed class JobsController : ControllerBase
         _logger.LogInformation("Deleted job {JobId}", id);
         return NoContent();
     }
+
+    [HttpPost("{id:guid}/execute")]
+    [RequirePermission(KKBOTPermissions.JobExecute, "job", "{id}")]
+    [ProducesResponseType(typeof(JobRun), 202)]
+    [ProducesResponseType(404)]
+    [SwaggerOperation("Execute a job", "Requires job.execute permission")]
+    public async Task<ActionResult<JobRun>> Execute(Guid id, [FromBody] ExecuteJobRequest? request, CancellationToken ct)
+    {
+        var job = await _repository.GetAsync(id, ct);
+        if (job is null) return NotFound();
+
+        var jobRun = new JobRun(Guid.NewGuid(), id, request?.InstanceId ?? Guid.Empty)
+        {
+            Parameters = request?.Parameters ?? "{}",
+            CorrelationId = Guid.NewGuid().ToString()
+        };
+
+        await _repository.AddJobRunAsync(jobRun, ct);
+        _logger.LogInformation("Started job run {JobRunId} for job {JobId}", jobRun.Id, id);
+        return AcceptedAtAction(nameof(GetJobRun), new { id = jobRun.Id }, jobRun);
+    }
+
+    [HttpGet("runs/{runId:guid}")]
+    [RequirePermission(KKBOTPermissions.JobRead)]
+    [ProducesResponseType(typeof(JobRun), 200)]
+    [ProducesResponseType(404)]
+    [SwaggerOperation("Get job run by ID", "Requires job.read permission")]
+    public async Task<ActionResult<JobRun>> GetJobRun(Guid runId, CancellationToken ct)
+    {
+        var jobRun = await _repository.GetJobRunAsync(runId, ct);
+        return jobRun is null ? NotFound() : Ok(jobRun);
+    }
 }
 
 public record CreateJobRequest(
-    Guid InstanceId,
-    JobType Type,
-    string? Payload = null,
+    string Name,
+    Guid ModuleId,
+    string TaskId,
+    string? Parameters = null,
     int Priority = 0,
-    DateTime? ScheduledAt = null
+    int MaxConcurrency = 1,
+    TimeSpan? Timeout = null
 );
 
 public record UpdateJobRequest(
-    JobStatus? Status = null,
+    string? Name = null,
+    string? TaskId = null,
+    string? Parameters = null,
     int? Priority = null,
-    string? Payload = null,
-    string? Result = null,
-    string? ErrorMessage = null,
-    DateTime? StartedAt = null,
-    DateTime? CompletedAt = null
+    int? MaxConcurrency = null,
+    TimeSpan? Timeout = null
+);
+
+public record ExecuteJobRequest(
+    Guid? InstanceId = null,
+    string? Parameters = null
 );

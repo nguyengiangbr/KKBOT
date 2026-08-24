@@ -18,12 +18,13 @@ using KKBOT.AI.Pipeline;
 using KKBOT.Analytics;
 using KKBOT.Collaboration;
 using KKBOT.Enterprise;
-using Serilog;
+using KKBOT.Agent;
+using KKBOT.Identity.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Serilog
-builder.Host.UseKkbotTelemetry();
+// Complete telemetry stack: Serilog + OpenTelemetry + Health Checks + Correlation IDs
+builder.Host.UseKkbotTelemetry(builder.Configuration, "KKBOT.API");
 
 // Controllers & API Explorer
 builder.Services.AddControllers();
@@ -102,6 +103,9 @@ builder.Services.AddKkbotCollaboration(builder.Configuration);
 // Enterprise
 builder.Services.AddKkbotEnterprise(builder.Configuration);
 
+// Game Agent Framework
+builder.Services.AddKkbotAgent(builder.Configuration);
+
 // Orchestration
 builder.Services.AddSingleton<EventStore>();
 builder.Services.AddSingleton<DagScheduler>();
@@ -123,6 +127,33 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
+});
+
+// Rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("api", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 100;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 10;
+    });
+    
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 5;
+    });
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.Headers["Retry-After"] = "60";
+        await context.HttpContext.Response.WriteAsJsonAsync(new { error = "Rate limit exceeded. Please try again later." });
+    };
 });
 
 var app = builder.Build();
@@ -147,9 +178,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Full telemetry pipeline: Correlation ID + Serilog Request Logging + Prometheus Metrics
+app.UseKkbotTelemetryPipeline();
+
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
-app.UseSerilogRequestLogging();
+
+// Rate limiting
+app.UseRateLimiter();
 
 // Tenant resolution middleware (must be before authentication)
 app.UseMiddleware<TenantResolutionMiddleware>();
@@ -158,5 +194,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllers();
+
+// Prometheus metrics endpoint
+app.MapPrometheusScrapingEndpoint();
 
 app.Run();

@@ -1,0 +1,952 @@
+@page "/scenarios/editor/{scenarioId?}"
+@inject IScenarioService ScenarioService
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject ILogger<VisualScenarioEditor> Logger
+
+<div class="scenario-editor">
+    <!-- Toolbar -->
+    <div class="editor-toolbar">
+        <div class="toolbar-group">
+            <button class="btn btn-primary" @onclick="SaveScenario" disabled="@isSaving">
+                <i class="oi oi-save"></i> @(scenarioId == null ? "Create" : "Save")
+            </button>
+            <button class="btn btn-secondary" @onclick="SaveAsScenario" disabled="@isSaving">
+                <i class="oi oi-file"></i> Save As
+            </button>
+            <button class="btn btn-secondary" @onclick="LoadScenario" disabled="@isLoading">
+                <i class="oi oi-folder"></i> Load
+            </button>
+        </div>
+        <div class="toolbar-group">
+            <button class="btn btn-info" @onclick="ValidateScenario" disabled="@isValidating">
+                <i class="oi oi-check"></i> Validate
+            </button>
+            <button class="btn btn-success" @onclick="RunScenario" disabled="@isRunning || scenario == null">
+                <i class="oi oi-media-play"></i> Run
+            </button>
+            <button class="btn btn-warning" @onclick="StopScenario" disabled="@!isRunning">
+                <i class="oi oi-media-stop"></i> Stop
+            </button>
+        </div>
+        <div class="toolbar-group toolbar-spacer"></div>
+        <div class="toolbar-group">
+            <span class="scenario-title">@(scenario?.Name ?? "New Scenario")</span>
+            <button class="btn btn-link" @onclick="ToggleSidebar">
+                <i class="oi @(showSidebar ? "oi-chevron-left" : "oi-chevron-right")"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Validation Results -->
+    @if (validationResult != null)
+    {
+        <div class="validation-banner @(validationResult.IsValid ? "valid" : "invalid")">
+            <i class="oi @(validationResult.IsValid ? "oi-check" : "oi-x")"></i>
+            <span>@(validationResult.IsValid ? "Scenario is valid" : "Validation failed: " + string.Join(", ", validationResult.Errors))</span>
+            @if (validationResult.Warnings.Count > 0)
+            {
+                <span class="warnings">@validationResult.Warnings.Count warnings</span>
+            }
+        </div>
+    }
+
+    <div class="editor-main">
+        <!-- Left Sidebar: Node Palette -->
+        @if (showSidebar)
+        {
+            <div class="editor-sidebar">
+                <div class="sidebar-tabs">
+                    <button class="@(activeTab == "palette" ? "active" : "")" @onclick="() => activeTab = 'palette'">Nodes</button>
+                    <button class="@(activeTab == "properties" ? "active" : "")" @onclick="() => activeTab = 'properties'">Properties</button>
+                    <button class="@(activeTab == "variables" ? "active" : "")" @onclick="() => activeTab = 'variables'">Variables</button>
+                </div>
+
+                @if (activeTab == "palette")
+                {
+                    <div class="node-palette">
+                        @foreach (var category in nodeCategories)
+                        {
+                            <div class="palette-category">
+                                <div class="category-header" @onclick="() => category.IsExpanded = !category.IsExpanded">
+                                    <i class="oi @(category.IsExpanded ? "oi-chevron-down" : "oi-chevron-right")"></i>
+                                    <span>@category.Name</span>
+                                </div>
+                                @if (category.IsExpanded)
+                                {
+                                    <div class="category-nodes">
+                                        @foreach (var nodeType in category.NodeTypes)
+                                        {
+                                            <div class="palette-node" draggable="true" 
+                                                 @ondragstart="(() => StartDrag(nodeType))"
+                                                 @onclick="(() => SelectNodeType(nodeType))">
+                                                <i class="oi @nodeType.Icon"></i>
+                                                <span>@nodeType.DisplayName</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else if (activeTab == "properties")
+                {
+                    <div class="properties-panel">
+                        @if (selectedNode != null)
+                        {
+                            <h4>@selectedNode.DisplayName</h4>
+                            <hr />
+                            <NodePropertiesEditor Node="selectedNode" OnChanged="OnNodePropertyChanged" />
+                        }
+                        else
+                        {
+                            <p class="text-muted">Select a node to edit properties</p>
+                        }
+                    </div>
+                }
+                else if (activeTab == "variables")
+                {
+                    <div class="variables-panel">
+                        <div class="panel-header">
+                            <h4>Scenario Variables</h4>
+                            <button class="btn btn-sm btn-primary" @onclick="AddVariable">
+                                <i class="oi oi-plus"></i> Add
+                            </button>
+                        </div>
+                        @foreach (var variable in scenario?.Variables ?? new())
+                        {
+                            <div class="variable-item">
+                                <input type="text" value="@variable.Key" @onchange="((e) => RenameVariable(variable.Key, e.Value?.ToString()))" />
+                                <input type="text" value="@variable.Value" @onchange="((e) => UpdateVariable(variable.Key, e.Value?.ToString()))" />
+                                <button class="btn btn-sm btn-danger" @onclick="(() => RemoveVariable(variable.Key))">
+                                    <i class="oi oi-trash"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Center: Canvas -->
+        <div class="editor-canvas-container" @ref="canvasContainer">
+            <canvas id="scenarioCanvas" class="scenario-canvas" 
+                    @ref="canvasElement"
+                    @ondrop="HandleDrop"
+                    @ondragover="HandleDragOver"
+                    @onclick="HandleCanvasClick"
+                    @oncontextmenu="HandleContextMenu"></canvas>
+            
+            <!-- Mini-map -->
+            <div class="minimap" @ref="minimapElement">
+                <canvas id="minimapCanvas"></canvas>
+            </div>
+
+            <!-- Zoom controls -->
+            <div class="zoom-controls">
+                <button class="btn btn-sm" @onclick="ZoomIn" title="Zoom In"><i class="oi oi-plus"></i></button>
+                <button class="btn btn-sm" @onclick="ZoomOut" title="Zoom Out"><i class="oi oi-minus"></i></button>
+                <button class="btn btn-sm" @onclick="ResetZoom" title="Reset Zoom"><i class="oi oi-reset"></i></button>
+                <span>@(Math.Round(zoomLevel * 100))%</span>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Execution Log -->
+        <div class="editor-log-panel">
+            <div class="log-header">
+                <h4>Execution Log</h4>
+                <button class="btn btn-sm" @onclick="ClearLog"><i class="oi oi-trash"></i></button>
+            </div>
+            <div class="log-content" @ref="logContainer">
+                @foreach (var entry in logEntries)
+                {
+                    <div class="log-entry @entry.Level">
+                        <span class="log-time">@entry.Timestamp.ToString("HH:mm:ss.fff")</span>
+                        <span class="log-message">@entry.Message</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    @if (showContextMenu)
+    {
+        <div class="context-menu" style="left:@contextMenuX px; top:@contextMenuY px;" @ref="contextMenuElement">
+            <div class="context-menu-item" @onclick="(() => DeleteSelectedNode())">
+                <i class="oi oi-trash"></i> Delete
+            </div>
+            <div class="context-menu-item" @onclick="(() => DuplicateSelectedNode())">
+                <i class="oi oi-copy"></i> Duplicate
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" @onclick="(() => CopySelectedNode())">
+                <i class="oi oi-clipboard"></i> Copy
+            </div>
+            <div class="context-menu-item" @onclick="(() => PasteNode())">
+                <i class="oi oi-paste"></i> Paste
+            </div>
+        </div>
+    }
+
+    <!-- Validation Modal -->
+    @if (showValidationModal)
+    {
+        <div class="modal-overlay" @onclick="CloseValidationModal">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h4>Validation Results</h4>
+                    <button class="btn btn-link" @onclick="CloseValidationModal"><i class="oi oi-x"></i></button>
+                </div>
+                <div class="modal-body">
+                    @if (validationResult.IsValid)
+                    {
+                        <div class="alert alert-success">Scenario is valid!</div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger">Validation failed</div>
+                    }
+                    @if (validationResult.Errors.Count > 0)
+                    {
+                        <h5>Errors</h5>
+                        <ul>
+                            @foreach (var error in validationResult.Errors)
+                            {
+                                <li class="text-danger">@error</li>
+                            }
+                        </ul>
+                    }
+                    @if (validationResult.Warnings.Count > 0)
+                    {
+                        <h5>Warnings</h5>
+                        <ul>
+                            @foreach (var warning in validationResult.Warnings)
+                            {
+                                <li class="text-warning">@warning</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Run Result Modal -->
+    @if (showRunResultModal)
+    {
+        <div class="modal-overlay" @onclick="CloseRunResultModal">
+            <div class="modal modal-lg" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h4>Execution Result</h4>
+                    <button class="btn btn-link" @onclick="CloseRunResultModal"><i class="oi oi-x"></i></button>
+                </div>
+                <div class="modal-body">
+                    @if (runResult != null)
+                    {
+                        <div class="@(runResult.IsSuccess ? "alert alert-success" : "alert alert-danger")">
+                            @(runResult.IsSuccess ? "Success" : "Failed") - @runResult.Duration.TotalMilliseconds ms
+                        </div>
+                        @if (!string.IsNullOrEmpty(runResult.ErrorMessage))
+                        {
+                            <pre class="bg-dark text-light p-3">@runResult.ErrorMessage</pre>
+                        }
+                        <h5>Step Results</h5>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr><th>Step</th><th>Type</th><th>Status</th><th>Duration</th><th>Output</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var step in runResult.StepResults)
+                                {
+                                    <tr class="@(step.IsSuccess ? "table-success" : "table-danger")">
+                                        <td>@step.StepNumber</td>
+                                        <td>@step.StepType</td>
+                                        <td>@(step.IsSuccess ? "Success" : "Failed")</td>
+                                        <td>@step.Duration.TotalMilliseconds ms</td>
+                                        <td><pre>@System.Text.Json.JsonSerializer.Serialize(step.Output, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    // State
+    private string? scenarioId;
+    private SimulationScenario? scenario;
+    private List<EditorNode> nodes = new();
+    private List<EditorEdge> edges = new();
+    private EditorNode? selectedNode;
+    private EditorNodeType? draggedNodeType;
+    private ScenarioValidationResult? validationResult;
+    private ScenarioExecutionResult? runResult;
+    private List<LogEntry> logEntries = new();
+    
+    // UI State
+    private bool showSidebar = true;
+    private string activeTab = "palette";
+    private bool showContextMenu = false;
+    private double contextMenuX, contextMenuY;
+    private bool showValidationModal = false;
+    private bool showRunResultModal = false;
+    private bool isSaving = false;
+    private bool isLoading = false;
+    private bool isValidating = false;
+    private bool isRunning = false;
+    
+    // Canvas
+    private ElementReference canvasElement;
+    private ElementReference canvasContainer;
+    private ElementReference minimapElement;
+    private ElementReference contextMenuElement;
+    private ElementReference logContainer;
+    private double zoomLevel = 1.0;
+    private double panX = 0, panY = 0;
+    
+    // Node Categories
+    private List<NodeCategory> nodeCategories = new()
+    {
+        new NodeCategory { Name = "Control Flow", IsExpanded = true, NodeTypes = new()
+        {
+            new EditorNodeType { Type = "if", DisplayName = "If/Else", Icon = "oi-code", Description = "Conditional branching" },
+            new EditorNodeType { Type = "loop", DisplayName = "Loop", Icon = "oi-loop-circular", Description = "Repeat steps (count/while/foreach)" },
+            new EditorNodeType { Type = "parallel", DisplayName = "Parallel", Icon = "oi-layers", Description = "Execute steps in parallel" },
+            new EditorNodeType { Type = "call", DisplayName = "Call Scenario", Icon = "oi-application", Description = "Execute sub-scenario" },
+        }},
+        new NodeCategory { Name = "Device", IsExpanded = true, NodeTypes = new()
+        {
+            new EditorNodeType { Type = "capture", DisplayName = "Capture Screen", Icon = "oi-monitor", Description = "Take screenshot" },
+            new EditorNodeType { Type = "input", DisplayName = "Send Input", Icon = "oi-mouse", Description = "Tap, swipe, text, key" },
+            new EditorNodeType { Type = "waitFor", DisplayName = "Wait For", Icon = "oi-timer", Description = "Wait for condition" },
+        }},
+        new NodeCategory { Name = "Perception", IsExpanded = true, NodeTypes = new()
+        {
+            new EditorNodeType { Type = "assert", DisplayName = "Assert", Icon = "oi-check", Description = "Verify condition (template, OCR, variable)" },
+        }},
+        new NodeCategory { Name = "Data", IsExpanded = true, NodeTypes = new()
+        {
+            new EditorNodeType { Type = "delay", DisplayName = "Delay", Icon = "oi-clock", Description = "Wait specified time" },
+            new EditorNodeType { Type = "set", DisplayName = "Set Variable", Icon = "oi-pencil", Description = "Set variable value" },
+        }},
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(scenarioId))
+        {
+            await LoadScenarioById(scenarioId);
+        }
+        else
+        {
+            scenario = new SimulationScenario { Id = Guid.NewGuid().ToString("N"), Name = "New Scenario" };
+            InitializeNewScenario();
+        }
+        
+        await InitializeCanvas();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeCanvas();
+            await JS.InvokeVoidAsync("setupCanvasInteractions", canvasElement, DotNetObjectReference.Create(this));
+        }
+        await RenderCanvas();
+    }
+
+    [JSInvokable]
+    public void OnNodeSelected(string nodeId)
+    {
+        selectedNode = nodes.FirstOrDefault(n => n.Id == nodeId);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnCanvasClick(double x, double y)
+    {
+        HideContextMenu();
+        selectedNode = null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnContextMenu(double x, double y, string? nodeId)
+    {
+        contextMenuX = x;
+        contextMenuY = y;
+        showContextMenu = true;
+        if (!string.IsNullOrEmpty(nodeId))
+        {
+            selectedNode = nodes.FirstOrDefault(n => n.Id == nodeId);
+        }
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnEdgeCreated(string sourceNodeId, string sourcePort, string targetNodeId, string targetPort)
+    {
+        var sourceNode = nodes.FirstOrDefault(n => n.Id == sourceNodeId);
+        var targetNode = nodes.FirstOrDefault(n => n.Id == targetNodeId);
+        if (sourceNode != null && targetNode != null)
+        {
+            edges.Add(new EditorEdge
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                SourceNodeId = sourceNodeId,
+                SourcePort = sourcePort,
+                TargetNodeId = targetNodeId,
+                TargetPort = targetPort
+            });
+            StateHasChanged();
+        }
+    }
+
+    // Methods
+    private void InitializeNewScenario()
+    {
+        nodes.Clear();
+        edges.Clear();
+        // Add start node
+        var startNode = new EditorNode
+        {
+            Id = "start",
+            Type = "start",
+            DisplayName = "Start",
+            Position = new NodePosition { X = 100, Y = 100 },
+            Ports = new List<NodePort> { new NodePort { Id = "out", Name = "Next", Type = PortType.Output } }
+        };
+        nodes.Add(startNode);
+    }
+
+    private async Task InitializeCanvas()
+    {
+        await JS.InvokeVoidAsync("initCanvas", canvasElement, minimapElement, zoomLevel, panX, panY);
+    }
+
+    private async Task RenderCanvas()
+    {
+        var canvasData = new CanvasData
+        {
+            Nodes = nodes.Select(n => new CanvasNode
+            {
+                Id = n.Id,
+                Type = n.Type,
+                DisplayName = n.DisplayName,
+                X = n.Position.X,
+                Y = n.Position.Y,
+                Ports = n.Ports.Select(p => new CanvasPort { Id = p.Id, Name = p.Name, Type = p.Type.ToString() }).ToList()
+            }).ToList(),
+            Edges = edges.Select(e => new CanvasEdge
+            {
+                Id = e.Id,
+                SourceNodeId = e.SourceNodeId,
+                SourcePort = e.SourcePort,
+                TargetNodeId = e.TargetNodeId,
+                TargetPort = e.TargetPort
+            }).ToList(),
+            Zoom = zoomLevel,
+            PanX = panX,
+            PanY = panY,
+            SelectedNodeId = selectedNode?.Id
+        };
+
+        await JS.InvokeVoidAsync("renderCanvas", canvasElement, canvasData);
+    }
+
+    private void StartDrag(EditorNodeType nodeType)
+    {
+        draggedNodeType = nodeType;
+    }
+
+    private void SelectNodeType(EditorNodeType nodeType)
+    {
+        // Could show preview or help
+    }
+
+    private async Task HandleDrop(DragEventArgs e)
+    {
+        if (draggedNodeType != null)
+        {
+            var rect = await JS.InvokeAsync<CanvasRect>("getCanvasRect", canvasElement);
+            var x = (e.ClientX - rect.Left - panX) / zoomLevel;
+            var y = (e.ClientY - rect.Top - panY) / zoomLevel;
+
+            var newNode = CreateNodeFromType(draggedNodeType, x, y);
+            nodes.Add(newNode);
+            edges.AddRange(CreateDefaultEdges(newNode));
+            draggedNodeType = null;
+            await RenderCanvas();
+            StateHasChanged();
+        }
+    }
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        e.DataTransfer.DropEffect = "copy";
+    }
+
+    private void HandleCanvasClick(MouseEventArgs e)
+    {
+        HideContextMenu();
+        selectedNode = null;
+        StateHasChanged();
+    }
+
+    private void HandleContextMenu(MouseEventArgs e)
+    {
+        e.PreventDefault();
+        contextMenuX = e.ClientX;
+        contextMenuY = e.ClientY;
+        showContextMenu = true;
+        StateHasChanged();
+    }
+
+    private void HideContextMenu()
+    {
+        showContextMenu = false;
+    }
+
+    private EditorNode CreateNodeFromType(EditorNodeType type, double x, double y)
+    {
+        var ports = GetPortsForType(type.Type);
+        return new EditorNode
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Type = type.Type,
+            DisplayName = type.DisplayName,
+            Position = new NodePosition { X = x, Y = y },
+            Ports = ports,
+            Properties = GetDefaultProperties(type.Type)
+        };
+    }
+
+    private List<NodePort> GetPortsForType(string type)
+    {
+        return type switch
+        {
+            "start" => new List<NodePort> { new NodePort { Id = "out", Name = "Next", Type = PortType.Output } },
+            "end" => new List<NodePort> { new NodePort { Id = "in", Name = "Previous", Type = PortType.Input } },
+            "if" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "then", Name = "Then", Type = PortType.Output },
+                new NodePort { Id = "else", Name = "Else", Type = PortType.Output }
+            },
+            "loop" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "body", Name = "Body", Type = PortType.Output },
+                new NodePort { Id = "out", Name = "Done", Type = PortType.Output }
+            },
+            "parallel" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            },
+            "call" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            },
+            "capture" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output },
+                new NodePort { Id = "frame", Name = "Frame", Type = PortType.Output }
+            },
+            "input" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            },
+            "waitFor" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            },
+            "assert" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "pass", Name = "Pass", Type = PortType.Output },
+                new NodePort { Id = "fail", Name = "Fail", Type = PortType.Output }
+            },
+            "delay" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            },
+            "set" => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            },
+            _ => new List<NodePort> 
+            { 
+                new NodePort { Id = "in", Name = "In", Type = PortType.Input },
+                new NodePort { Id = "out", Name = "Out", Type = PortType.Output }
+            }
+        };
+    }
+
+    private Dictionary<string, object> GetDefaultProperties(string type)
+    {
+        return type switch
+        {
+            "delay" => new Dictionary<string, object> { ["durationMs"] = 1000 },
+            "input" => new Dictionary<string, object> { ["type"] = "tap", ["x"] = 0, ["y"] = 0 },
+            "assert" => new Dictionary<string, object> { ["type"] = "template", ["threshold"] = 0.85 },
+            "waitFor" => new Dictionary<string, object> { ["timeoutMs"] = 30000, ["pollIntervalMs"] = 500 },
+            "loop" => new Dictionary<string, object> { ["type"] = "count", ["count"] = 1 },
+            "set" => new Dictionary<string, object> { ["name"] = "", ["value"] = "" },
+            "call" => new Dictionary<string, object> { ["scenarioId"] = "" },
+            _ => new Dictionary<string, object>()
+        };
+    }
+
+    private List<EditorEdge> CreateDefaultEdges(EditorNode newNode)
+    {
+        var newEdges = new List<EditorEdge>();
+        
+        // Connect to selected node if it has an output port
+        if (selectedNode != null && selectedNode.Ports.Any(p => p.Type == PortType.Output))
+        {
+            var sourcePort = selectedNode.Ports.First(p => p.Type == PortType.Output);
+            var targetPort = newNode.Ports.FirstOrDefault(p => p.Type == PortType.Input);
+            if (targetPort != null)
+            {
+                newEdges.Add(new EditorEdge
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    SourceNodeId = selectedNode.Id,
+                    SourcePort = sourcePort.Id,
+                    TargetNodeId = newNode.Id,
+                    TargetPort = targetPort.Id
+                });
+            }
+        }
+        return newEdges;
+    }
+
+    private async Task SaveScenario()
+    {
+        if (scenario == null) return;
+        isSaving = true;
+        try
+        {
+            UpdateScenarioFromEditor();
+            await ScenarioService.SaveAsync(scenario);
+            AddLog("Scenario saved successfully", LogLevel.Info);
+        }
+        finally { isSaving = false; }
+    }
+
+    private async Task SaveAsScenario()
+    {
+        // Show dialog for new name
+        var name = await JS.InvokeAsync<string>("prompt", "Enter scenario name:", scenario?.Name);
+        if (!string.IsNullOrEmpty(name))
+        {
+            scenario = scenario with { Name = name, Id = Guid.NewGuid().ToString("N") };
+            await SaveScenario();
+        }
+    }
+
+    private async Task LoadScenario()
+    {
+        // Navigate to scenario list
+        Navigation.NavigateTo("/scenarios");
+    }
+
+    private async Task LoadScenarioById(string id)
+    {
+        isLoading = true;
+        try
+        {
+            scenario = await ScenarioService.GetAsync(id);
+            if (scenario != null)
+            {
+                LoadScenarioToEditor();
+            }
+        }
+        finally { isLoading = false; }
+    }
+
+    private void LoadScenarioToEditor()
+    {
+        nodes.Clear();
+        edges.Clear();
+        // Convert scenario steps to editor nodes
+        // This is simplified - real implementation would map step types to node types
+    }
+
+    private void UpdateScenarioFromEditor()
+    {
+        // Convert editor nodes/edges back to scenario steps
+    }
+
+    private async Task ValidateScenario()
+    {
+        isValidating = true;
+        try
+        {
+            UpdateScenarioFromEditor();
+            validationResult = await ScenarioService.ValidateAsync(scenario!);
+            showValidationModal = true;
+            AddLog(validationResult.IsValid ? "Validation passed" : "Validation failed", 
+                   validationResult.IsValid ? LogLevel.Info : LogLevel.Error);
+        }
+        finally { isValidating = false; }
+    }
+
+    private async Task RunScenario()
+    {
+        if (scenario == null) return;
+        isRunning = true;
+        showRunResultModal = false;
+        logEntries.Clear();
+        
+        try
+        {
+            UpdateScenarioFromEditor();
+            AddLog("Starting scenario execution...", LogLevel.Info);
+            runResult = await ScenarioService.ExecuteAsync(scenario, new CancellationTokenSource(TimeSpan.FromMinutes(5)).Token);
+            showRunResultModal = true;
+            AddLog(runResult.IsSuccess ? "Scenario completed successfully" : "Scenario failed", 
+                   runResult.IsSuccess ? LogLevel.Info : LogLevel.Error);
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Execution error: {ex.Message}", LogLevel.Error);
+        }
+        finally { isRunning = false; }
+    }
+
+    private void StopScenario()
+    {
+        // Cancel execution
+        isRunning = false;
+        AddLog("Execution stopped by user", LogLevel.Warning);
+    }
+
+    private void OnNodePropertyChanged(string propertyName, object value)
+    {
+        if (selectedNode != null)
+        {
+            selectedNode.Properties[propertyName] = value;
+            StateHasChanged();
+        }
+    }
+
+    private void AddVariable()
+    {
+        if (scenario != null)
+        {
+            var newName = $"var_{scenario.Variables.Count + 1}";
+            scenario.Variables[newName] = "";
+            StateHasChanged();
+        }
+    }
+
+    private void RenameVariable(string oldName, string? newName)
+    {
+        if (scenario != null && !string.IsNullOrEmpty(newName) && newName != oldName)
+        {
+            var value = scenario.Variables[oldName];
+            scenario.Variables.Remove(oldName);
+            scenario.Variables[newName] = value;
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateVariable(string name, string? value)
+    {
+        if (scenario != null)
+        {
+            scenario.Variables[name] = value ?? "";
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveVariable(string name)
+    {
+        if (scenario != null)
+        {
+            scenario.Variables.Remove(name);
+            StateHasChanged();
+        }
+    }
+
+    private void DeleteSelectedNode()
+    {
+        if (selectedNode != null)
+        {
+            nodes.Remove(selectedNode);
+            edges.RemoveAll(e => e.SourceNodeId == selectedNode.Id || e.TargetNodeId == selectedNode.Id);
+            selectedNode = null;
+            HideContextMenu();
+            _ = RenderCanvas();
+            StateHasChanged();
+        }
+    }
+
+    private void DuplicateSelectedNode()
+    {
+        if (selectedNode != null)
+        {
+            var duplicate = new EditorNode
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Type = selectedNode.Type,
+                DisplayName = selectedNode.DisplayName + " (copy)",
+                Position = new NodePosition { X = selectedNode.Position.X + 20, Y = selectedNode.Position.Y + 20 },
+                Ports = selectedNode.Ports.Select(p => new NodePort { Id = p.Id, Name = p.Name, Type = p.Type }).ToList(),
+                Properties = new Dictionary<string, object>(selectedNode.Properties)
+            };
+            nodes.Add(duplicate);
+            HideContextMenu();
+            _ = RenderCanvas();
+            StateHasChanged();
+        }
+    }
+
+    private void CopySelectedNode()
+    {
+        // Store in clipboard
+    }
+
+    private void PasteNode()
+    {
+        // Paste from clipboard
+    }
+
+    private void ZoomIn()
+    {
+        zoomLevel = Math.Min(zoomLevel * 1.2, 3.0);
+        _ = RenderCanvas();
+    }
+
+    private void ZoomOut()
+    {
+        zoomLevel = Math.Max(zoomLevel / 1.2, 0.25);
+        _ = RenderCanvas();
+    }
+
+    private void ResetZoom()
+    {
+        zoomLevel = 1.0;
+        panX = 0;
+        panY = 0;
+        _ = RenderCanvas();
+    }
+
+    private void ToggleSidebar()
+    {
+        showSidebar = !showSidebar;
+        StateHasChanged();
+    }
+
+    private void CloseValidationModal() => showValidationModal = false;
+    private void CloseRunResultModal() => showRunResultModal = false;
+
+    private void ClearLog()
+    {
+        logEntries.Clear();
+        StateHasChanged();
+    }
+
+    private void AddLog(string message, LogLevel level)
+    {
+        logEntries.Insert(0, new LogEntry { Timestamp = DateTimeOffset.Now, Message = message, Level = level.ToString().ToLower() });
+        if (logEntries.Count > 100) logEntries.RemoveAt(logEntries.Count - 1);
+        StateHasChanged();
+    }
+}
+
+// Supporting classes
+public class EditorNode
+{
+    public string Id { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public NodePosition Position { get; set; } = new();
+    public List<NodePort> Ports { get; set; } = new();
+    public Dictionary<string, object> Properties { get; set; } = new();
+}
+
+public class NodePosition { public double X { get; set; } public double Y { get; set; } }
+
+public class NodePort
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public PortType Type { get; set; }
+}
+
+public enum PortType { Input, Output }
+
+public class EditorEdge
+{
+    public string Id { get; set; } = "";
+    public string SourceNodeId { get; set; } = "";
+    public string SourcePort { get; set; } = "";
+    public string TargetNodeId { get; set; } = "";
+    public string TargetPort { get; set; } = "";
+}
+
+public class EditorNodeType
+{
+    public string Type { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Icon { get; set; } = "";
+    public string Description { get; set; } = "";
+}
+
+public class NodeCategory
+{
+    public string Name { get; set; } = "";
+    public bool IsExpanded { get; set; }
+    public List<EditorNodeType> NodeTypes { get; set; } = new();
+}
+
+public class CanvasData
+{
+    public List<CanvasNode> Nodes { get; set; } = new();
+    public List<CanvasEdge> Edges { get; set; } = new();
+    public double Zoom { get; set; }
+    public double PanX { get; set; }
+    public double PanY { get; set; }
+    public string? SelectedNodeId { get; set; }
+}
+
+public class CanvasNode
+{
+    public string Id { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public double X { get; set; }
+    public double Y { get; set; }
+    public List<CanvasPort> Ports { get; set; } = new();
+}
+
+public class CanvasPort { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public string Type { get; set; } = ""; }
+
+public class CanvasEdge
+{
+    public string Id { get; set; } = "";
+    public string SourceNodeId { get; set; } = "";
+    public string SourcePort { get; set; } = "";
+    public string TargetNodeId { get; set; } = "";
+    public string TargetPort { get; set; } = "";
+}
+
+public class CanvasRect { public double Left { get; set; } public double Top { get; set; } }
+
+public class LogEntry { public DateTimeOffset Timestamp { get; set; } public string Message { get; set; } = ""; public string Level { get; set; } = ""; }

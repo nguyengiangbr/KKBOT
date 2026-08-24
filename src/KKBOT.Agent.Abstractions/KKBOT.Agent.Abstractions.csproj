@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Agent.Abstractions</AssemblyName>
+    <RootNamespace>KKBOT.Agent.Abstractions</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.OrchestrationKKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

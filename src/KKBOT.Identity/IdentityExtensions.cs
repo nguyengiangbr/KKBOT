@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using KKBOT.Identity;
+using KKBOT.Identity.Authorization;
 using KKBOT.Identity.Middleware;
 using KKBOT.Identity.Services;
 
@@ -94,6 +95,18 @@ public static class IdentityExtensions
                             {
                                 identity?.AddClaim(new System.Security.Claims.Claim("permission", permission));
                             }
+                            
+                            // Add tenant claims
+                            var tenantId = user.TenantId?.ToString();
+                            if (!string.IsNullOrEmpty(tenantId))
+                            {
+                                identity?.AddClaim(new System.Security.Claims.Claim("tenant_id", tenantId));
+                                var tenantRole = await GetUserTenantRoleAsync(userManager, user, tenantId);
+                                if (!string.IsNullOrEmpty(tenantRole))
+                                {
+                                    identity?.AddClaim(new System.Security.Claims.Claim($"tenant_role:{tenantId}", tenantRole));
+                                }
+                            }
                         }
                         else if (user != null && !user.IsActive)
                         {
@@ -104,17 +117,14 @@ public static class IdentityExtensions
             };
         });
 
-        // Authorization policies
+        // Authorization: Register PermissionAuthorizationHandler and policies
+        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddAuthorization(options =>
         {
-            // Permission-based policies
-            foreach (var permission in KKBOTPermissions.All)
-            {
-                options.AddPolicy($"RequirePermission:{permission}", policy =>
-                    policy.Requirements.Add(new PermissionRequirement(permission)));
-            }
-
-            // Role-based policies
+            // Register all KKBOT permission policies using the extension
+            options.AddKkbotPermissionPolicies();
+            
+            // Role-based policies (backward compatibility)
             options.AddPolicy("SuperAdmin", policy => policy.RequireRole("SuperAdmin"));
             options.AddPolicy("TenantAdmin", policy => policy.RequireRole("SuperAdmin", "TenantAdmin"));
             options.AddPolicy("Operator", policy => policy.RequireRole("SuperAdmin", "TenantAdmin", "Operator"));
@@ -131,6 +141,22 @@ public static class IdentityExtensions
         services.AddTransient<TenantResolutionMiddleware>();
 
         return services;
+    }
+
+    private static async Task<string?> GetUserTenantRoleAsync(UserManager<ApplicationUser> userManager, ApplicationUser user, string tenantId)
+    {
+        // In a real implementation, this would query user-tenant roles
+        // For now, return a default based on global role
+        var roles = await userManager.GetRolesAsync(user);
+        if (roles.Contains("SuperAdmin") || roles.Contains("SystemAdmin"))
+            return "TenantAdmin";
+        if (roles.Contains("TenantAdmin"))
+            return "TenantAdmin";
+        if (roles.Contains("Operator"))
+            return "Operator";
+        if (roles.Contains("Developer"))
+            return "Developer";
+        return "Viewer";
     }
 }
 

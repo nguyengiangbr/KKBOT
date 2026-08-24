@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Agent.Coordination.Grpc</AssemblyName>
+    <RootNamespace>KKBOT.Agent.Coordination.Grpc</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..KKBOT.Agent.Coordination.AbstractionsKKBOT.Agent.Coordination.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.Agent.CoordinationKKBOT.Agent.Coordination.csproj" />
+    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.57.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.21.12" />
+    <PackageReference Include="Grpc.Tools" Version="2.57.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="coordination.proto" GrpcServices="Server" />
+  </ItemGroup>
+
+</Project>

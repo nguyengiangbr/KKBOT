@@ -274,3 +274,18 @@ public sealed record ExperimentResults(
     Dictionary<string, object> Comparison,
     string Conclusion
 );
+
+/// <summary>
+/// Represents a chunk of streaming inference response.
+/// </summary>
+public sealed record InferenceStreamChunk(
+    string Content,
+    bool IsFinal,
+    Dictionary<string, object>? Metadata = null)
+{
+    public static InferenceStreamChunk Chunk(string content, Dictionary<string, object>? metadata = null) 
+        => new(content, false, metadata);
+    
+    public static InferenceStreamChunk Final(string content, Dictionary<string, object>? metadata = null) 
+        => new(content, true, metadata);
+}

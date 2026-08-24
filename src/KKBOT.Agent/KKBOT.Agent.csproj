@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.Agent</AssemblyName>
+    <RootNamespace>KKBOT.Agent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..KKBOT.Agent.AbstractionsKKBOT.Agent.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.AI.OllamaKKBOT.AI.Ollama.csproj" />
+    <ProjectReference Include="..KKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..KKBOT.OrchestrationKKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
+    <ProjectReference Include="..KKBOT.Persistence.EfCoreKKBOT.Persistence.EfCore.csproj" />
+    <ProjectReference Include="..KKBOT.VisualScriptingKKBOT.VisualScripting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.0.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Planners" Version="1.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="Polly" Version="8.0.0" />
+    <PackageReference Include="CEL.NET" Version="1.0.0" />
+    <PackageReference Include="pgvector" Version="0.2.0" />
+  </ItemGroup>
+
+</Project>

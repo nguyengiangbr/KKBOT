@@ -1,0 +1,85 @@
+{
+  "name": "kkbot-devtools",
+  "displayName": "KKBOT Development Tools",
+  "description": "VS Code extension for KKBOT game automation development",
+  "version": "1.0.0",
+  "publisher": "kkbot",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Debuggers", "Other"],
+  "activationEvents": [
+    "onCommand:kkbot.createPlugin",
+    "onCommand:kkbot.runScenario",
+    "onCommand:kkbot.deployPlugin",
+    "onCommand:kkbot.openDashboard",
+    "onLanguage:kkbot-scenario",
+    "workspaceContains:**/plugins/**/*.cs"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "kkbot.createPlugin", "title": "KKBOT: Create New Plugin", "category": "KKBOT" },
+      { "command": "kkbot.runScenario", "title": "KKBOT: Run Scenario", "category": "KKBOT" },
+      { "command": "kkbot.deployPlugin", "title": "KKBOT: Deploy Plugin", "category": "KKBOT" },
+      { "command": "kkbot.openDashboard", "title": "KKBOT: Open Dashboard", "category": "KKBOT" },
+      { "command": "kkbot.buildPlugin", "title": "KKBOT: Build Plugin", "category": "KKBOT" },
+      { "command": "kkbot.debugScenario", "title": "KKBOT: Debug Scenario", "category": "KKBOT" }
+    ],
+    "configuration": {
+      "title": "KKBOT",
+      "properties": {
+        "kkbot.apiUrl": { "type": "string", "default": "http://localhost:5000", "description": "KKBOT API base URL" },
+        "kkbot.pluginsPath": { "type": "string", "default": "./plugins", "description": "Path to plugins directory" },
+        "kkbot.autoReload": { "type": "boolean", "default": true, "description": "Auto-reload plugins on file change" },
+        "kkbot.debugPort": { "type": "number", "default": 9229, "description": "Debug port for plugin debugging" }
+      }
+    },
+    "views": {
+      "kkbot-explorer": [
+        { "id": "kkbot.plugins", "name": "Plugins", "when": "kkbot.hasPlugins" },
+        { "id": "kkbot.scenarios", "name": "Scenarios", "when": "kkbot.hasScenarios" },
+        { "id": "kkbot.instances", "name": "Instances", "when": "kkbot.hasInstances" },
+        { "id": "kkbot.devices", "name": "Devices", "when": "kkbot.hasDevices" }
+      ]
+    },
+    "keybindings": [
+      { "command": "kkbot.runScenario", "key": "ctrl+shift+r", "mac": "cmd+shift+r", "when": "editorTextFocus" },
+      { "command": "kkbot.buildPlugin", "key": "ctrl+shift+b", "mac": "cmd+shift+b", "when": "editorTextFocus && resourceLangId == csharp" },
+      { "command": "kkbot.debugScenario", "key": "f5", "when": "editorTextFocus && resourceLangId == kkbot-scenario" }
+    ],
+    "languages": [
+      { "id": "kkbot-scenario", "aliases": ["KKBOT Scenario", "kkbot-scenario"], "extensions": [".kscn", ".scenario"], "configuration": "./language-configuration.json" }
+    ],
+    "debuggers": [
+      {
+        "type": "kkbot-scenario",
+        "label": "KKBOT Scenario Debugger",
+        "program": "${workspaceFolder}/bin/Debug/net10.0/${command:pickProcess}",
+        "runtime": "dotnet",
+        "configurationAttributes": {
+          "launch": {
+            "required": ["scenarioId"],
+            "properties": {
+              "scenarioId": { "type": "string", "description": "Scenario ID to debug" },
+              "deviceId": { "type": "string", "description": "Device ID to use for debugging" }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0"
+  }
+}
