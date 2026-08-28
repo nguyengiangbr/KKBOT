@@ -82,28 +82,31 @@ public sealed class OllamaService : IAiService
             var line = await reader.ReadLineAsync();
             if (string.IsNullOrWhiteSpace(line)) continue;
 
+            OllamaStreamResponse? streamResponse;
             try
             {
-                var streamResponse = JsonSerializer.Deserialize<OllamaStreamResponse>(line, _jsonOptions);
-                if (streamResponse == null) continue;
-
-                if (!string.IsNullOrEmpty(streamResponse.Response))
-                {
-                    fullContent = (fullContent ?? "") + streamResponse.Response;
-                    yield return new AiStreamChunk(streamResponse.Response, false);
-                }
-
-                if (streamResponse.Done)
-                {
-                    finalUsage = new AiUsage(streamResponse.EvalCount + streamResponse.PromptEvalCount, (int)streamResponse.TotalDuration);
-                    finishReason = "stop";
-                    yield return AiStreamChunk.Final(fullContent ?? "", finalUsage, finishReason);
-                    break;
-                }
+                streamResponse = JsonSerializer.Deserialize<OllamaStreamResponse>(line, _jsonOptions);
             }
             catch (JsonException ex)
             {
                 _logger.LogWarning(ex, "Failed to parse Ollama stream response: {Line}", line);
+                continue;
+            }
+
+            if (streamResponse == null) continue;
+
+            if (!string.IsNullOrEmpty(streamResponse.Response))
+            {
+                fullContent = (fullContent ?? "") + streamResponse.Response;
+                yield return new AiStreamChunk(streamResponse.Response, false);
+            }
+
+            if (streamResponse.Done)
+            {
+                finalUsage = new AiUsage(streamResponse.EvalCount + streamResponse.PromptEvalCount, (int)streamResponse.TotalDuration);
+                finishReason = "stop";
+                yield return AiStreamChunk.Final(fullContent ?? "", finalUsage, finishReason);
+                break;
             }
         }
     }

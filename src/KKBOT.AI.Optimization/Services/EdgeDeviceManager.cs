@@ -37,8 +37,8 @@ public sealed class EdgeDeviceManager : IEdgeDeviceManager
             throw new InvalidOperationException($"Device {device.DeviceId} already registered");
 
         device.Capabilities ??= new Dictionary<string, object>();
-        device.SupportedPrecisions ??= GetDefaultPrecisions(device.Platform);
-        device.SupportedFrameworks ??= GetDefaultFrameworks(device.Platform);
+        device.SupportedPrecisions ??= GetDefaultPrecisions(device.Platform).ToList();
+        device.SupportedFrameworks ??= GetDefaultFrameworks(device.Platform).ToList();
 
         _devices[device.DeviceId] = device;
         await SaveDevicesAsync(ct);

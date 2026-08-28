@@ -95,12 +95,12 @@ public sealed record DagEdge(
 // State machine to DAG converter
 public interface IStateMachineToDagConverter
 {
-    DynamicDag Convert(IReadOnlyList<IStateDefinition> states, DagBuildContext context);
+    DynamicDag Convert(IReadOnlyCollection<IStateDefinition> states, DagBuildContext context);
 }
 
 public sealed class StateMachineToDagConverter : IStateMachineToDagConverter
 {
-    public DynamicDag Convert(IReadOnlyList<IStateDefinition> states, DagBuildContext context)
+    public DynamicDag Convert(IReadOnlyCollection<IStateDefinition> states, DagBuildContext context)
     {
         var dag = new DynamicDag();
         

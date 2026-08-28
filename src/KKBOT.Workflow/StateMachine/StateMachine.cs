@@ -128,7 +128,7 @@ public sealed class StateMachine : IStateMachine, IDisposable
 
                     if (unknownState != null && unknownState != _currentState)
                     {
-                        return TransitionTo(unknownState, "Unknown state detected", context.CurrentConfidence, isUnknown);
+                        return Task.FromResult(TransitionTo(unknownState, "Unknown state detected", context.CurrentConfidence, isUnknown));
                     }
 
                     // Stay in current state with unknown result
@@ -141,7 +141,7 @@ public sealed class StateMachine : IStateMachine, IDisposable
 
                 if (bestMatch != _currentState)
                 {
-                    return TransitionTo(bestMatch, $"Detected state: {bestMatch.Name}", bestConfidence, false);
+                    return Task.FromResult(TransitionTo(bestMatch, $"Detected state: {bestMatch.Name}", bestConfidence, false));
                 }
 
                 var stayResult = new TransitionResult(
@@ -172,7 +172,7 @@ public sealed class StateMachine : IStateMachine, IDisposable
                 return Task.FromResult<Result<TransitionResult>>(
                     Error.NotFound("STATE_NOT_FOUND", $"State '{stateId}' not found."));
 
-            return TransitionTo(targetState, reason ?? "Forced transition", 1.0, false);
+            return Task.FromResult(TransitionTo(targetState, reason ?? "Forced transition", 1.0, false));
         }
     }
 
@@ -253,14 +253,14 @@ public sealed class StateMachine : IStateMachine, IDisposable
 /// </summary>
 public sealed class StateDefinition
 {
-    public string Id { get; init; } = string.Empty;
-    public string Name { get; init; } = string.Empty;
-    public string Category { get; init; } = string.Empty;
-    public Func<PerceptionContext?, bool> EntryCondition { get; init; } = _ => false;
-    public IReadOnlyList<StateDefinition> NextStates { get; init; } = Array.Empty<StateDefinition>();
-    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
-    public RetryPolicy RetryPolicy { get; init; } = new();
-    public EvidencePolicy EvidencePolicy { get; init; } = new();
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public Func<PerceptionContext?, bool> EntryCondition { get; set; } = _ => false;
+    public IReadOnlyList<StateDefinition> NextStates { get; set; } = Array.Empty<StateDefinition>();
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
+    public RetryPolicy RetryPolicy { get; set; } = new();
+    public EvidencePolicy EvidencePolicy { get; set; } = new();
 }
 
 /// <summary>

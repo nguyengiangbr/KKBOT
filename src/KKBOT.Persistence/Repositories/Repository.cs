@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace KKBOT.Persistence.Repositories;
 
-public sealed class Repository<T> : IRepository<T> where T : class
+public class Repository<T> : IRepository<T> where T : class
 {
     private readonly KkbBotDbContext _context;
     private readonly DbSet<T> _dbSet;

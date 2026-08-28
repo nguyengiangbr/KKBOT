@@ -1,3 +1,4 @@
+using KKBOT.Domain.Enums;
 using KKBOT.Domain.Models;
 using System.Threading;
 using System.Threading.Tasks;

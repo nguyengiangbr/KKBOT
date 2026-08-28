@@ -10,27 +10,26 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..KKBOT.Agent.AbstractionsKKBOT.Agent.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.AI.OllamaKKBOT.AI.Ollama.csproj" />
-    <ProjectReference Include="..KKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.OrchestrationKKBOT.Orchestration.csproj" />
-    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
-    <ProjectReference Include="..KKBOT.Persistence.EfCoreKKBOT.Persistence.EfCore.csproj" />
-    <ProjectReference Include="..KKBOT.VisualScriptingKKBOT.VisualScripting.csproj" />
+    <ProjectReference Include="..\KKBOT.Agent.Abstractions\KKBOT.Agent.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Ollama\KKBOT.AI.Ollama.csproj" />
+    <ProjectReference Include="..\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Persistence.EfCore\KKBOT.Persistence.EfCore.csproj" />
+    <ProjectReference Include="..\KKBOT.VisualScripting\KKBOT.VisualScripting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-    <PackageReference Include="Microsoft.SemanticKernel" Version="1.0.0" />
-    <PackageReference Include="Microsoft.SemanticKernel.Planners" Version="1.0.0" />
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
-    <PackageReference Include="Polly" Version="8.0.0" />
-    <PackageReference Include="CEL.NET" Version="1.0.0" />
-    <PackageReference Include="pgvector" Version="0.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.SemanticKernel" />
+    <PackageReference Include="Microsoft.SemanticKernel.Planners" />
+    <PackageReference Include="Polly" />
+    <PackageReference Include="CEL.NET" />
+    <PackageReference Include="pgvector" />
   </ItemGroup>
 
 </Project>

@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using KKBOT.Marketplace.Server.Models;
 using KKBOT.Marketplace.Server.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 

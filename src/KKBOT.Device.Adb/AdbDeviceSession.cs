@@ -16,7 +16,7 @@ public sealed class AdbDeviceSession : IDeviceSession
 {
     private readonly string _deviceId;
     private readonly AdbClientOptions _options;
-    private readonly ILogger<AdbDeviceSession> _logger;
+    private readonly ILogger _logger;
     private readonly AdbCommandRunner _commandRunner;
     private readonly AdbScreenshotProvider _screenshotProvider;
     private readonly AdbInputDispatcher _inputDispatcher;
@@ -28,7 +28,7 @@ public sealed class AdbDeviceSession : IDeviceSession
     public AdbDeviceSession(
         string deviceId,
         AdbClientOptions options,
-        ILogger<AdbDeviceSession> logger,
+        ILogger logger,
         AdbCommandRunner commandRunner)
     {
         _deviceId = deviceId;

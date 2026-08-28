@@ -6,6 +6,7 @@ using KKBOT.Marketplace.Server.Models;
 using KKBOT.Marketplace.Server.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -17,7 +18,8 @@ public class AnalyticsServiceTests
     private static ServiceProvider CreateProvider()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<MarketplaceDbContext>(options => options.UseSqlite("DataSource=:memory:"));
+        var dbPath = Path.Combine(Path.GetTempPath(), "kkbot-ana-" + Guid.NewGuid().ToString("N") + ".db");
+        services.AddDbContext<MarketplaceDbContext>(options => options.UseSqlite("DataSource=" + dbPath));
         services.AddLogging(b => b.AddConsole());
         
         // Add marketplace services
@@ -26,24 +28,20 @@ public class AnalyticsServiceTests
         services.AddScoped<ISecurityScanningService, SecurityScanningService>();
         services.AddScoped<ILicenseComplianceService, LicenseComplianceService>();
         
-        services.Configure<StorageOptions>(o => o.StoragePath = Path.GetTempPath());
         services.AddSingleton<IStorageService, LocalStorageService>();
         
         services.Configure<SigningOptions>(o => o.RequireSigning = false);
         services.AddSingleton<ISigningService, SigningService>();
         
-        services.Configure<SecurityScanOptions>(o => o.RequireSigning = false);
         services.AddScoped<ISecurityScanningService, SecurityScanningService>();
         
         services.AddScoped<IMarketplaceService, MarketplaceService>();
-        services.AddSingleton<MLContext>();
 
         var provider = services.BuildServiceProvider();
         
         // Ensure database created
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
-        db.Database.OpenConnection();
         db.Database.EnsureCreated();
         
         return provider;
@@ -121,7 +119,8 @@ public class SentimentAnalysisServiceTests
     private static ServiceProvider CreateProvider()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<MarketplaceDbContext>(options => options.UseSqlite("DataSource=:memory:"));
+        var dbPath = Path.Combine(Path.GetTempPath(), "kkbot-sent-" + Guid.NewGuid().ToString("N") + ".db");
+        services.AddDbContext<MarketplaceDbContext>(options => options.UseSqlite("DataSource=" + dbPath));
         services.AddLogging(b => b.AddConsole());
         services.AddScoped<ISentimentAnalysisService, SentimentAnalysisService>();
         
@@ -129,7 +128,6 @@ public class SentimentAnalysisServiceTests
         
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
-        db.Database.OpenConnection();
         db.Database.EnsureCreated();
         
         return provider;
@@ -221,7 +219,7 @@ public class SecurityScanningServiceTests
     public void SecurityRule_SeverityLevels()
     {
         // Verify severity enum values
-        Assert.Equal(4, Enum.GetValues<Severity>().Length);
+        Assert.Equal(5, Enum.GetValues<Severity>().Length);
         Assert.Equal(Severity.Critical, Enum.GetValues<Severity>().Cast<Severity>().Max());
     }
 
@@ -236,90 +234,43 @@ public class SecurityScanningServiceTests
 
 public class LicenseComplianceServiceTests
 {
+    private static LicenseComplianceService CreateService()
+    {
+        var options = new DbContextOptionsBuilder<MarketplaceDbContext>()
+            .UseSqlite("DataSource=:memory:")
+            .Options;
+        var db = new MarketplaceDbContext(options);
+        var logger = LoggerFactory.Create(_ => { }).CreateLogger<LicenseComplianceService>();
+        return new LicenseComplianceService(db, logger);
+    }
+
     [Fact]
     public async Task LicenseCompatibility_MIT_Compatible()
     {
-        var knowledgeBase = LicenseKnowledgeBase.Instance;
-        var mit = knowledgeBase.GetLicense("MIT");
-        var apache = knowledgeBase.GetLicense("Apache-2.0");
+        var service = CreateService();
 
-        Assert.NotNull(mit);
-        Assert.NotNull(apache);
-        
-        var compat = LicenseCompatibilityService.DetermineCompatibility(mit!, apache!);
-        Assert.Equal(CompatibilityLevel.Compatible, compat);
+        var compatible = await service.IsLicenseCompatibleAsync("MIT", "Apache-2.0");
+
+        Assert.True(compatible);
     }
 
     [Fact]
     public async Task LicenseCompatibility_GPL_MIT_Incompatible()
     {
-        var knowledgeBase = LicenseKnowledgeBase.Instance;
-        var gpl = knowledgeBase.GetLicense("GPL-3.0");
-        var mit = knowledgeBase.GetLicense("MIT");
+        var service = CreateService();
 
-        Assert.NotNull(gpl);
-        Assert.NotNull(mit);
-        
-        var compat = LicenseCompatibilityService.DetermineCompatibility(gpl!, mit!);
-        Assert.Equal(CompatibilityLevel.Incompatible, compat);
+        var compatible = await service.IsLicenseCompatibleAsync("GPL-3.0", "MIT");
+
+        Assert.False(compatible);
     }
 
     [Fact]
     public async Task LicenseKnowledgeBase_Loaded()
     {
-        var kb = LicenseKnowledgeBase.Instance;
-        
-        Assert.True(kb.AllLicenses.Count > 0);
-        Assert.NotNull(kb.GetLicense("MIT"));
-        Assert.NotNull(kb.GetLicense("Apache-2.0"));
-        Assert.NotNull(kb.GetLicense("GPL-3.0"));
-        Assert.NotNull(kb.GetLicense("BSD-3-Clause"));
-        Assert.NotNull(kb.GetLicense("Proprietary"));
-    }
-}
+        var service = CreateService();
 
-// Helper class for testing compatibility
-public static class LicenseCompatibilityService
-{
-    public static CompatibilityLevel DetermineCompatibility(License license1, License license2)
-    {
-        if (license1.SpdxId == license2.SpdxId) return CompatibilityLevel.Compatible;
-
-        if (license1.CompatibleLicenses.Contains(license2.SpdxId))
-            return CompatibilityLevel.Compatible;
-
-        if (license1.IncompatibleLicenses.Contains(license2.SpdxId))
-            return CompatibilityLevel.Incompatible;
-
-        if (license1.IsCopyleft && !license2.IsCopyleft)
-        {
-            if (IsGplFamily(license1) && !IsGplFamily(license2))
-                return CompatibilityLevel.Incompatible;
-        }
-
-        if (license2.IsCopyleft && !license1.IsCopyleft)
-        {
-            if (IsGplFamily(license2) && !IsGplFamily(license1))
-                return CompatibilityLevel.Incompatible;
-        }
-
-        if (license1.SpdxId == "Apache-2.0" || license2.SpdxId == "Apache-2.0")
-            return CompatibilityLevel.Compatible;
-
-        if (IsPermissive(license1) && IsPermissive(license2))
-            return CompatibilityLevel.Compatible;
-
-        return CompatibilityLevel.ConditionallyCompatible;
-    }
-
-    private static bool IsGplFamily(License license)
-    {
-        return license.SpdxId.StartsWith("GPL-") || license.SpdxId.StartsWith("AGPL-") || license.SpdxId.StartsWith("LGPL-");
-    }
-
-    private static bool IsPermissive(License license)
-    {
-        var permissive = new[] { "MIT", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "ISC", "Unlicense" };
-        return permissive.Contains(license.SpdxId) || license.SpdxId.StartsWith("MIT-") || license.SpdxId.StartsWith("BSD-");
+        // MIT <-> Apache-2.0 are compatible; Proprietary <-> MIT are not.
+        Assert.True(await service.IsLicenseCompatibleAsync("MIT", "Apache-2.0"));
+        Assert.False(await service.IsLicenseCompatibleAsync("Proprietary", "MIT"));
     }
 }

@@ -146,13 +146,13 @@ public sealed class ChatService : IChatService
     private async Task<SessionParticipant?> GetParticipantAsync(Guid sessionId, string userId)
     {
         return await _dbContext.SessionParticipants
-            .FirstOrDefaultAsync(p => p.SessionId == userId && p.UserId == userId);
+            .FirstOrDefaultAsync(p => p.SessionId == sessionId && p.UserId == userId);
     }
 
     private string GetParticipantName(Guid sessionId, string userId)
     {
         var participant = _dbContext.SessionParticipants
-            .FirstOrDefault(p => p.SessionId == userId && p.UserId == userId);
+            .FirstOrDefault(p => p.SessionId == sessionId && p.UserId == userId);
         return participant?.UserName ?? userId;
     }
 }

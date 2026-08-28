@@ -1,7 +1,12 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using KKBOT.Perception.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace KKBOT.Plugins.Abstractions;
 
@@ -17,6 +22,32 @@ public interface IGameModule
     IReadOnlyCollection<IGameTaskDefinition> GetTasks();
     IReadOnlyCollection<IStateDefinition> GetStates();
     Task<ModuleValidationResult> ValidateAsync(ModuleContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Display name of the game. Defaults to <see cref="Id"/> for modules that don't override it.
+    /// </summary>
+    string GameName => Id;
+
+    /// <summary>
+    /// Called once before the plugin starts. Default is a no-op.
+    /// </summary>
+    Task InitializeAsync(IServiceProvider services, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>
+    /// Starts the plugin. Default is a no-op.
+    /// </summary>
+    Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>
+    /// Stops the plugin. Default is a no-op.
+    /// </summary>
+    Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>
+    /// Returns the current health of the plugin. Default reports healthy.
+    /// </summary>
+    Task<ModuleHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ModuleHealth { IsHealthy = true, Status = HealthStatus.Healthy });
 }
 
 public sealed record ModuleManifest

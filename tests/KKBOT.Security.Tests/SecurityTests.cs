@@ -5,9 +5,10 @@ using KKBOT.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
-namespace KKBOT.Security.Tests;
+namespace KKBOT.Security.Tests
 {
     public class SecurityTests
     {

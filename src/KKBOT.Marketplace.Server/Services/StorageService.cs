@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Minio;
-using Minio.DataModel.Args;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -66,7 +65,7 @@ public sealed class MinioStorageService : IStorageService
             var exists = await _minioClient.BucketExistsAsync(args);
             if (!exists)
             {
-                var makeArgs = new MakeBucketArgs().WithBucket(_options.BucketName).WithRegion(_options.Region);
+                var makeArgs = new MakeBucketArgs().WithBucket(_options.BucketName);
                 await _minioClient.MakeBucketAsync(makeArgs);
                 
                 // Set bucket policy for public read access to icons
@@ -199,7 +198,7 @@ public sealed class MinioStorageService : IStorageService
             .WithObject(objectName)
             .WithExpiry((int)expiry.TotalSeconds);
 
-        return await _minioClient.PresignedGetObjectAsync(args, ct);
+        return await _minioClient.PresignedGetObjectAsync(args);
     }
 
     private async Task<bool> DeleteObjectAsync(string objectName, CancellationToken ct)

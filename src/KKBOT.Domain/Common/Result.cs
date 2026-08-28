@@ -65,7 +65,7 @@ public readonly struct Result<T> : IEquatable<Result<T>>
             {
                 throw new InvalidOperationException("Cannot access Error on a successful result.");
             }
-            return _error!;
+            return _error ?? throw new InvalidOperationException("Error not set on failed result.");
         }
     }
 
@@ -94,7 +94,7 @@ public readonly struct Result<T> : IEquatable<Result<T>>
     /// </summary>
     public Result<TNew> Map<TNew>(Func<T, TNew> mapper)
     {
-        return IsSuccess ? Result<TNew>.Success(mapper(_value!)) : Result<TNew>.Failure(_error!);
+        return IsSuccess ? Result<TNew>.Success(mapper(_value!)) : Result<TNew>.Failure(_error ?? throw new InvalidOperationException("Error not set on failed result."));
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public readonly struct Result<T> : IEquatable<Result<T>>
     /// </summary>
     public Result<TNew> Bind<TNew>(Func<T, Result<TNew>> binder)
     {
-        return IsSuccess ? binder(_value!) : Result<TNew>.Failure(_error!);
+        return IsSuccess ? binder(_value!) : Result<TNew>.Failure(_error ?? throw new InvalidOperationException("Error not set on failed result."));
     }
 
     /// <summary>
@@ -124,7 +124,7 @@ public readonly struct Result<T> : IEquatable<Result<T>>
     {
         if (IsFailure)
         {
-            action(_error!);
+            action(_error ?? throw new InvalidOperationException("Error not set on failed result."));
         }
         return this;
     }
@@ -134,7 +134,7 @@ public readonly struct Result<T> : IEquatable<Result<T>>
     /// </summary>
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onFailure)
     {
-        return IsSuccess ? onSuccess(_value!) : onFailure(_error!);
+        return IsSuccess ? onSuccess(_value!) : onFailure(_error ?? throw new InvalidOperationException("Error not set on failed result."));
     }
 
     public bool Equals(Result<T> other)
@@ -192,7 +192,7 @@ public readonly struct Result : IEquatable<Result>
             {
                 throw new InvalidOperationException("Cannot access Error on a successful result.");
             }
-            return _error!;
+            return _error ?? throw new InvalidOperationException("Error not set on failed result.");
         }
     }
 
@@ -230,7 +230,7 @@ public readonly struct Result : IEquatable<Result>
     {
         if (IsFailure)
         {
-            action(_error!);
+            action(_error ?? throw new InvalidOperationException("Error not set on failed result."));
         }
         return this;
     }
@@ -240,7 +240,7 @@ public readonly struct Result : IEquatable<Result>
     /// </summary>
     public TResult Match<TResult>(Func<TResult> onSuccess, Func<Error, TResult> onFailure)
     {
-        return IsSuccess ? onSuccess() : onFailure(_error!);
+        return IsSuccess ? onSuccess() : onFailure(_error ?? throw new InvalidOperationException("Error not set on failed result."));
     }
 
     public bool Equals(Result other) => _isSuccess == other._isSuccess && Equals(_error, other._error);

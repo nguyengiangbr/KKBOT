@@ -15,7 +15,7 @@ using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 
 // Serilog
-builder.Host.UseKkbotTelemetry();
+builder.Host.UseKkbotTelemetry(builder.Configuration);
 
 // Controllers & API Explorer
 builder.Services.AddControllers();

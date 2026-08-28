@@ -185,7 +185,7 @@ public sealed class LocalPluginInstaller : IPluginInstaller
 {
     private readonly IPluginRegistry _registry;
     private readonly IPluginRepository _repository;
-    private readonly PluginLoader _pluginLoader;
+    private readonly IPluginLoader _pluginLoader;
     private readonly ILogger<LocalPluginInstaller> _logger;
     private readonly string _pluginsPath;
     private readonly ConcurrentDictionary<string, InstalledPluginInfo> _installed = new();
@@ -193,7 +193,7 @@ public sealed class LocalPluginInstaller : IPluginInstaller
     public LocalPluginInstaller(
         IPluginRegistry registry,
         IPluginRepository repository,
-        PluginLoader pluginLoader,
+        IPluginLoader pluginLoader,
         ILogger<LocalPluginInstaller> logger,
         IOptions<MarketplaceOptions> options)
     {

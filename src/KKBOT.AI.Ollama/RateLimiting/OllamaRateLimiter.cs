@@ -5,6 +5,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using KKBOT.Resilience.CircuitBreaker;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +17,7 @@ namespace KKBOT.AI.Ollama.RateLimiting;
 /// <summary>
 /// Rate limiter for Ollama AI endpoints with token bucket algorithm.
 /// </summary>
-public sealed class OllamaRateLimiter : IDisposable
+public sealed class OllamaRateLimiter : IDisposable, IHostedService
 {
     private readonly OllamaRateLimiterOptions _options;
     private readonly ILogger _logger;
@@ -106,6 +110,10 @@ public sealed class OllamaRateLimiter : IDisposable
         _shutdownCts.Cancel();
         _refillTimer?.Dispose();
     }
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 /// <summary>
@@ -276,13 +284,14 @@ public static class OllamaRateLimiterExtensions
 /// <summary>
 /// Circuit breaker for Ollama AI calls.
 /// </summary>
-public sealed class OllamaCircuitBreaker
+public sealed class OllamaCircuitBreaker : IHostedService
 {
     private readonly CircuitBreaker _circuitBreaker;
     private readonly ILogger _logger;
 
     public OllamaCircuitBreaker(
         ILogger<OllamaCircuitBreaker> logger,
+        ILoggerFactory loggerFactory,
         IOptions<CircuitBreakerOptions> options)
     {
         _logger = logger;
@@ -290,6 +299,10 @@ public sealed class OllamaCircuitBreaker
             loggerFactory.CreateLogger<CircuitBreaker>(),
             options);
     }
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
     {

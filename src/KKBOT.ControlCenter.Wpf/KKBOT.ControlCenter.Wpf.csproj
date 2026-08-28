@@ -14,12 +14,21 @@
     <ProjectReference Include="..\KKBOT.Application\KKBOT.Application.csproj" />
     <ProjectReference Include="..\KKBOT.Dashboard\KKBOT.Dashboard.csproj" />
     <ProjectReference Include="..\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Wpf\KKBOT.Plugins.Wpf.csproj" />
+    <ProjectReference Include="..\KKBOT.Navigation\KKBOT.Navigation.csproj" />
+    <ProjectReference Include="..\KKBOT.Security\KKBOT.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 </Project>

@@ -25,7 +25,7 @@ public sealed class SampleGameModule : IGameModule
             Version = Version,
             Author = "KKBOT",
             Description = "A minimal sample module for demonstration purposes.",
-            SupportedResolutions = new[] { new Resolution { Width = 1280, Height = 720 } },
+            SupportedResolutions = new[] { new Resolution(1280, 720) },
             RequiredPermissions = new[] { "DEVICE_READ", "INPUT_WRITE" },
             ConfigSchema = "{ \"type\": \"object\" }",
             DefaultConfig = "{}",
@@ -58,11 +58,7 @@ public sealed class SampleGameModule : IGameModule
     {
         // Sample validation always succeeds.
         await Task.CompletedTask;
-        return new ModuleValidationResult
-        {
-            IsValid = true,
-            Errors = Array.Empty<ModuleValidationError>()
-        };
+        return new ModuleValidationResult(true, Array.Empty<ModuleValidationError>());
     }
 }
 
@@ -108,6 +104,7 @@ public sealed class SimpleStateDefinition : IStateDefinition
         Category = category;
         EntryCondition = entryCondition;
         Action = action;
+        NextStateIds = (nextStateIds as IReadOnlyList<string>) ?? nextStateIds.ToList();
         NextStates = nextStateIds.Select(id => (IStateDefinition)new SimpleStateDefinitionPlaceholder(id)).ToArray();
         Timeout = timeout;
         RetryPolicy = retryPolicy;
@@ -119,6 +116,7 @@ public sealed class SimpleStateDefinition : IStateDefinition
     public string Category { get; }
     public Func<PerceptionContext?, bool> EntryCondition { get; }
     public IStateAction? Action { get; }
+    public IReadOnlyList<string> NextStateIds { get; }
     public IReadOnlyList<IStateDefinition> NextStates { get; }
     public TimeSpan Timeout { get; }
     public RetryPolicy RetryPolicy { get; }
@@ -136,6 +134,7 @@ public sealed class SimpleStateDefinitionPlaceholder : IStateDefinition
     public string Category => "placeholder";
     public Func<PerceptionContext?, bool> EntryCondition => _ => false;
     public IStateAction? Action => null;
+    public IReadOnlyList<string> NextStateIds => Array.Empty<string>();
     public IReadOnlyList<IStateDefinition> NextStates => Array.Empty<IStateDefinition>();
     public TimeSpan Timeout => TimeSpan.Zero;
     public RetryPolicy RetryPolicy => new();

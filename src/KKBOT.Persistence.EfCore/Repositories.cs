@@ -56,7 +56,7 @@ public sealed class EfJobRepository : IJobRepository
         => await _context.Jobs.FindAsync(new object[] { id }, cancellationToken);
 
     public async Task<IReadOnlyList<Job>> GetByInstanceAsync(Guid instanceId, CancellationToken cancellationToken)
-        => await _context.Jobs.AsNoTracking().Where(j => j.InstanceId == instanceId).ToListAsync(cancellationToken);
+        => await _context.Jobs.AsNoTracking().Where(j => j.Runs.Any(r => r.InstanceId == instanceId)).ToListAsync(cancellationToken);
 
     public async Task AddAsync(Job job, CancellationToken cancellationToken)
     {

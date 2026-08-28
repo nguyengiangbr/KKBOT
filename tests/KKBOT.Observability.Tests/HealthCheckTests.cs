@@ -3,7 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using KKBOT.Observability;
 using Xunit;
 
-namespace KKBOT.Observability.Tests;
+namespace KKBOT.Observability.Tests
 {
     public class HealthCheckTests
     {
@@ -11,6 +11,7 @@ namespace KKBOT.Observability.Tests;
         public void AddKkbotHealthChecks_RegistersHealthCheck()
         {
             var services = new ServiceCollection();
+            services.AddLogging();
             services.AddKkbotHealthChecks();
             var provider = services.BuildServiceProvider();
             var healthChecks = provider.GetService<HealthCheckService>();

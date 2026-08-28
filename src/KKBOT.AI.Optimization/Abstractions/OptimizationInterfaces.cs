@@ -153,7 +153,6 @@ public sealed class BenchmarkResult
     public double PeakPowerWatts { get; set; }
     public double AveragePowerWatts { get; set; }
     public double EnergyPerInferenceMJ { get; set; }
-    public int BatchSize { get; set; }
     public int Iterations { get; set; }
     public TimeSpan TotalDuration { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;

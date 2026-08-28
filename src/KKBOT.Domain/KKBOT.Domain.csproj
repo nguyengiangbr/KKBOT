@@ -9,9 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" />
     <PackageReference Include="NodaTime" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="MediatR" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.Contracts\KKBOT.Contracts.csproj" />
   </ItemGroup>
 </Project>

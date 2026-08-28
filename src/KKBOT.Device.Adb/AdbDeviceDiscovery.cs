@@ -18,7 +18,7 @@ public sealed class AdbDeviceDiscovery : IDeviceDiscovery
     private readonly AdbClientOptions _options;
     private readonly ILogger<AdbDeviceDiscovery> _logger;
     private readonly AdbCommandRunner _commandRunner;
-    private readonly PeriodicTimer? _discoveryTimer;
+    private PeriodicTimer? _discoveryTimer;
     private readonly CancellationTokenSource _discoveryCts = new();
 
     public event Action<DeviceInfo>? DeviceConnected;

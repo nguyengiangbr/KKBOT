@@ -4,7 +4,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
-using KKBOT.Identity.Models;
+using KKBOT.Identity;
 
 namespace KKBOT.Identity.Authorization;
 
@@ -146,7 +146,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         // For resource-specific permissions, we can check ownership or tenant membership
         // This is where you'd integrate with your resource services
         
-        switch (requirement.ResourceType.ToLowerInvariant())
+        switch (requirement.ResourceType!.ToLowerInvariant())
         {
             case "instance":
                 return await CheckInstancePermissionAsync(user, requirement.ResourceId!, requirement.Permission, tenantId);

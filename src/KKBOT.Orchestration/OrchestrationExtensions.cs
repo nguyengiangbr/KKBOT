@@ -1,16 +1,19 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using KKBOT.Orchestration.DynamicDag;
 using KKBOT.Orchestration.EventSourcing;
 using KKBOT.Orchestration.MultiTenancy;
 using KKBOT.Orchestration.Projections;
 using KKBOT.Orchestration.Saga;
 using KKBOT.Persistence.EfCore;
+using KKBOT.Plugins.Loader;
 using KKBOT.Observability;
 
 namespace KKBOT.Orchestration;
@@ -104,7 +107,7 @@ public sealed class InMemorySagaRepository : ISagaRepository
 
     public Task<IReadOnlyList<ISaga>> GetByStatusAsync(SagaStatus status, CancellationToken ct)
     {
-        return Task.FromResult(_sagas.Values.Where(s => s.Status == status).ToList().AsReadOnly());
+        return Task.FromResult<IReadOnlyList<ISaga>>(_sagas.Values.Where(s => s.Status == status).ToList().AsReadOnly());
     }
 }
 
@@ -130,7 +133,7 @@ public sealed class InMemoryTenantProvider : ITenantProvider
 
     public Task<IReadOnlyList<TenantContext>> GetAllTenantsAsync(CancellationToken ct)
     {
-        return Task.FromResult(_tenants.Values.ToList().AsReadOnly());
+        return Task.FromResult<IReadOnlyList<TenantContext>>(_tenants.Values.ToList().AsReadOnly());
     }
 
     public Task<TenantContext> CreateTenantAsync(string tenantId, string tenantName, TenantSettings? settings = null, CancellationToken ct = default)

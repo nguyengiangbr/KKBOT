@@ -19,7 +19,9 @@ public sealed class AesEncryptionService : IEncryptionService
 
     public AesEncryptionService(string passphrase, string salt)
     {
+#pragma warning disable SYSLIB0060
         using var pbkdf2 = new Rfc2898DeriveBytes(passphrase, Encoding.UTF8.GetBytes(salt), 100_000, HashAlgorithmName.SHA256);
+#pragma warning restore SYSLIB0060
         _key = pbkdf2.GetBytes(32); // 256 bits
         _iv = pbkdf2.GetBytes(16);  // 128 bits
     }

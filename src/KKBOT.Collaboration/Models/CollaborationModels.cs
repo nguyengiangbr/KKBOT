@@ -16,7 +16,7 @@ public sealed class CollaborationSession
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public Guid InstanceId { get; set; }
-    public Guid OwnerId { get; set; }
+    public string OwnerId { get; set; } = string.Empty;
     public string TenantId { get; set; } = string.Empty;
     public SessionStatus Status { get; set; } = SessionStatus.Waiting;
     public SessionType Type { get; set; } = SessionType.CollaborativeControl;
@@ -155,7 +155,7 @@ public sealed class ViewportInfo
     public double X { get; set; }
     public double Y { get; set; }
     public double Width { get; set; }
-    public Height { get; set; }
+    public double Height { get; set; }
     public double Scale { get; set; } = 1.0;
 }
 
@@ -200,6 +200,7 @@ public sealed class ChatMessage
     public MessageType Type { get; set; } = MessageType.Text;
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
     public bool IsSystemMessage { get; set; } = false;
+    public bool IsEdited { get; set; } = false;
     public Dictionary<string, object> Metadata { get; set; } = new();
     public List<MessageReaction> Reactions { get; set; } = new();
 }
@@ -290,6 +291,7 @@ public sealed class SessionRecording
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid SessionId { get; set; }
+    public CollaborationSession Session { get; set; } = null!;
     public string FilePath { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
     public RecordingFormat Format { get; set; } = RecordingFormat.Custom;
@@ -378,6 +380,9 @@ public enum ReplayStatus
 
 public sealed class LiveReplayParticipant
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ReplayId { get; set; }
+    public LiveReplay Replay { get; set; } = null!;
     public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
@@ -402,7 +407,7 @@ public sealed class SharedWorkspace
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public Guid OwnerId { get; set; }
+    public string OwnerId { get; set; } = string.Empty;
     public string TenantId { get; set; } = string.Empty;
     public WorkspaceType Type { get; set; } = WorkspaceType.Document;
     public WorkspaceContent Content { get; set; } = new();
@@ -437,6 +442,9 @@ public sealed class WorkspaceContent
 
 public sealed class WorkspaceCollaborator
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid WorkspaceId { get; set; }
+    public SharedWorkspace Workspace { get; set; } = null!;
     public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public CollaboratorRole Role { get; set; } = CollaboratorRole.Editor;
@@ -491,16 +499,16 @@ public sealed class ActivityFeed
     public string TenantId { get; set; } = string.Empty;
     public ActivityType Type { get; set; }
     public string ActorId { get; set; } = string.Empty;
-    public string ActorName { get; set; } = string.Empty.
-    public string ActorAvatar { get; set; } = string.Empty.
+    public string ActorName { get; set; } = string.Empty;
+    public string ActorAvatar { get; set; } = string.Empty;
     public string Action { get; set; } = string.Empty;
     public string TargetType { get; set; } = string.Empty;
-    public string TargetId { get; set; } = string.Empty.
-    public string TargetName { get; set; } = string.Empty.
-    public string Description { get; set; } = string.Empty.
+    public string TargetId { get; set; } = string.Empty;
+    public string TargetName { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
     public Dictionary<string, object> Metadata { get; set; } = new();
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow.
-    public bool IsPublic { get; set; } = true.
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsPublic { get; set; } = true;
 }
 
 public enum ActivityType

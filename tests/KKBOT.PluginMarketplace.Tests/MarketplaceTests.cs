@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using KKBOT.PluginMarketplace;
+using KKBOT.Plugins.Loader;
 using KKBOT.Plugins.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -126,7 +127,7 @@ public class LocalPluginInstallerTests
     private readonly LocalPluginInstaller _installer;
     private readonly Mock<IPluginRegistry> _mockRegistry;
     private readonly Mock<IPluginRepository> _mockRepository;
-    private readonly Mock<PluginLoader> _mockLoader;
+    private readonly Mock<IPluginLoader> _mockLoader;
 
     public LocalPluginInstallerTests()
     {
@@ -135,7 +136,7 @@ public class LocalPluginInstallerTests
 
         _mockRegistry = new Mock<IPluginRegistry>();
         _mockRepository = new Mock<IPluginRepository>();
-        _mockLoader = new Mock<PluginLoader>(NullLogger<PluginLoader>.Instance);
+        _mockLoader = new Mock<IPluginLoader>();
 
         var options = Options.Create(new MarketplaceOptions { PluginsPath = _testPluginsPath });
 

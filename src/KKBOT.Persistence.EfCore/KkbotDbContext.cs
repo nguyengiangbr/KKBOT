@@ -19,29 +19,70 @@ public sealed class KkbotDbContext : DbContext
         modelBuilder.Entity<Instance>(e =>
         {
             e.HasKey(i => i.Id);
-            e.Property(i => i.Name).IsRequired().HasMaxLength(200);
-            e.Property(i => i.Status).HasConversion<string>();
-            e.OwnsOne(i => i.Module, m =>
-            {
-                m.Property(p => p.Id).HasColumnName("ModuleId");
-                m.Property(p => p.Name).HasColumnName("ModuleName");
-                m.Property(p => p.Version).HasColumnName("ModuleVersion");
-            });
+            e.Property(i => i.DisplayName).IsRequired().HasMaxLength(200);
+            e.Property(i => i.State).HasConversion<string>();
+
+            e.HasOne(i => i.Device)
+                .WithMany(d => d.Instances)
+                .HasForeignKey(i => i.DeviceId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(i => i.Module)
+                .WithMany(m => m.Instances)
+                .HasForeignKey(i => i.ModuleId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(i => i.Profile)
+                .WithMany(p => p.Instances)
+                .HasForeignKey(i => i.ProfileId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<Job>(e =>
+        modelBuilder.Entity<Device>(e =>
         {
-            e.HasKey(j => j.Id);
-            e.Property(j => j.InstanceId).IsRequired();
-            e.Property(j => j.Type).HasConversion<string>();
-            e.Property(j => j.Status).HasConversion<string>();
-            e.Property(j => j.Payload).HasColumnType("TEXT");
+            e.HasKey(d => d.Id);
+            e.Property(d => d.DisplayName).IsRequired().HasMaxLength(200);
+            e.HasOne(d => d.CurrentInstance)
+                .WithMany()
+                .HasForeignKey(d => d.CurrentInstanceId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Profile>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.DisplayName).IsRequired().HasMaxLength(200);
+            e.HasOne(p => p.Module)
+                .WithMany(m => m.Profiles)
+                .HasForeignKey(p => p.ModuleId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Module>(e =>
         {
             e.HasKey(m => m.Id);
-            e.Property(m => m.Name).IsRequired().HasMaxLength(200);
+            e.Property(m => m.DisplayName).IsRequired().HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<Job>(e =>
+        {
+            e.HasOne(j => j.Module)
+                .WithMany()
+                .HasForeignKey(j => j.ModuleId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Job>(e =>
+        {
+            e.HasKey(j => j.Id);
+            e.Property(j => j.Key).IsRequired().HasMaxLength(100);
+            e.Property(j => j.DisplayName).IsRequired().HasMaxLength(200);
+            e.Property(j => j.TaskId).IsRequired().HasMaxLength(100);
+            e.Property(j => j.Parameters).HasColumnType("TEXT");
+        });
+
+        modelBuilder.Entity<Module>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.DisplayName).IsRequired().HasMaxLength(200);
             e.Property(m => m.Version).IsRequired().HasMaxLength(50);
         });
     }

@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using KKBOT.Collaboration.Abstractions;
+using KKBOT.Collaboration.Data;
 using KKBOT.Collaboration.Models;
 using KKBOT.Collaboration.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,13 +17,19 @@ namespace KKBOT.Collaboration.Tests;
 
 public class CollaborationTests
 {
+    private static SqliteConnection? _activeConnection;
+
     private static ServiceProvider CreateProvider()
     {
         var services = new ServiceCollection();
-        services.AddLogging(b => b.AddConsole());
+        services.AddLogging();
+        
+        var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        _activeConnection = connection;
         
         services.AddDbContext<CollaborationDbContext>(options => 
-            options.UseSqlite("DataSource=:memory:"));
+            options.UseSqlite(connection));
         
         services.AddScoped<ICollaborationSessionService, CollaborationSessionService>();
         services.AddScoped<IParticipantService, ParticipantService>();
@@ -32,10 +40,9 @@ public class CollaborationTests
 
         var provider = services.BuildServiceProvider();
         
-        // Ensure database created
+        // Ensure database created on the shared, still-open connection
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CollaborationDbContext>();
-        db.Database.OpenConnection();
         db.Database.EnsureCreated();
         
         return provider;
@@ -113,7 +120,7 @@ public class CollaborationTests
         var session = await sessionService.CreateSessionAsync(request, "owner-123", CancellationToken.None);
 
         // Join session
-        var joinRequest = new JoinSessionRequest("Test User", "https://avatar.com/user.png", ParticipantRole.Viewer);
+        var joinRequest = new JoinSessionRequest("Test User", "https://avatar.com/user.png", "user-123", ParticipantRole.Viewer);
         var participant = await participantService.JoinSessionAsync(session.Id, joinRequest, CancellationToken.None);
 
         Assert.NotNull(participant);
@@ -126,7 +133,7 @@ public class CollaborationTests
         Assert.True(left);
 
         var leftParticipant = await participantService.GetParticipantAsync(session.Id, "user-123", CancellationToken.None);
-        Assert.Equal(ParticipantStatus.Disconnected, leftParticipant.Status);
+        Assert.Equal(ParticipantStatus.Disconnected, leftParticipant!.Status);
         Assert.NotNull(leftParticipant.LeftAt);
     }
 
@@ -143,11 +150,11 @@ public class CollaborationTests
             "owner-123", CancellationToken.None);
 
         // Add participants
-        await participantService.JoinSessionAsync(session.Id, 
-            new JoinSessionRequest("Controller", "avatar.png", ParticipantRole.Controller), 
+        await participantService.JoinSessionAsync(session.Id,
+            new JoinSessionRequest("Controller", "avatar.png", "owner", ParticipantRole.Owner),
             CancellationToken.None);
-        await participantService.JoinSessionAsync(session.Id, 
-            new JoinSessionRequest("Viewer", "avatar.png", ParticipantRole.Viewer), 
+        await participantService.JoinSessionAsync(session.Id,
+            new JoinSessionRequest("Viewer", "avatar.png", "viewer", ParticipantRole.Viewer),
             CancellationToken.None);
 
         // Grant control
@@ -186,7 +193,7 @@ public class CollaborationTests
 
         // Add reaction
         var reacted = await chatService.AddReactionAsync(message.Id, "👍", "user-456", CancellationToken.None);
-        var reaction = assertedMessage.Reactions.FirstOrDefault(r => r.Emoji == "👍");
+        var reaction = reacted.Reactions.FirstOrDefault(r => r.Emoji == "👍");
         Assert.NotNull(reaction);
         Assert.Equal("👍", reaction.Emoji);
         Assert.Equal("user-456", reaction.UserId);

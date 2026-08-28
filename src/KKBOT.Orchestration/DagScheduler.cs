@@ -30,6 +30,7 @@ public sealed class DagScheduler
     /// </summary>
     /// <param name="jobs">List of jobs with dependencies.</param>
     /// <param name="runJobAsync">Callback that runs a single job and returns true on success.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task RunAsync(IReadOnlyList<DagJob> jobs, Func<DagJob, CancellationToken, Task<bool>> runJobAsync, CancellationToken cancellationToken)
     {
         // Topological sort to detect cycles and order execution.
@@ -46,10 +47,10 @@ public sealed class DagScheduler
             }
 
             _logger.LogInformation("Starting DAG job {JobId}", job.JobId);
-            _eventStore.Append(new JobStartedEvent(Guid.Empty, job.JobId)); // InstanceId empty for generic usage.
+            await _eventStore.Append(new JobStartedEvent(Guid.Empty, job.JobId)); // InstanceId empty for generic usage.
             var success = await runJobAsync(job, cancellationToken);
             completed.Add(job.JobId);
-            _eventStore.Append(new JobCompletedEvent(Guid.Empty, job.JobId, success));
+            await _eventStore.Append(new JobCompletedEvent(Guid.Empty, job.JobId, success));
             _logger.LogInformation("Job {JobId} completed with success={Success}", job.JobId, success);
         }
     }

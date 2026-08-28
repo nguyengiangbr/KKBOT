@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
+using KKBOT.Identity.Services;
 
 namespace KKBOT.Identity.Middleware;
 
@@ -24,7 +26,7 @@ public sealed class TenantResolutionMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         // Resolve tenant from various sources
-        var tenantId = ResolveTenantId(context);
+        var tenantId = await ResolveTenantIdAsync(context);
         
         if (tenantId != null)
         {
@@ -49,7 +51,7 @@ public sealed class TenantResolutionMiddleware
         await _next(context);
     }
 
-    private Guid? ResolveTenantId(HttpContext context)
+    private async Task<Guid?> ResolveTenantIdAsync(HttpContext context)
     {
         // 1. Check header
         if (context.Request.Headers.TryGetValue("X-Tenant-ID", out var headerTenantId))

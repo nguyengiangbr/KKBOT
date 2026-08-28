@@ -225,7 +225,7 @@ public sealed class LicenseController : ControllerBase
 }
 
 public sealed record EvaluatePolicyRequest(string PluginId, string Version, string PolicyId);
-public sealed record CreatePolicyRequest(string Name, string Description, string[] AllowedLicenses, string[] DisallowedLicenses, bool RequireCopyleftApproval, bool RequirePatentGrant, bool BlockOnConflict, LicensePolicyRule[] Rules);
+public sealed record CreatePolicyRequest(string Name, string Description, string[] AllowedLicenses, string[] DisallowedLicenses, bool RequireCopyleftApproval, bool RequirePatentGrant, bool BlockOnConflict, PolicyRule[] Rules);
 
 public sealed record LicenseInfo(string SpdxId, string Name, string Url, bool IsOsiApproved, bool IsCopyleft);
 public sealed record LicenseDetail(string SpdxId, string Name, string FullText, string Url, bool IsOsiApproved, bool IsCopyleft, bool HasPatentGrant, LicenseObligations Obligations);

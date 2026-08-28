@@ -36,12 +36,12 @@ public sealed class InstanceOrchestrator
     /// </summary>
     public async Task RunInstanceAsync(Instance instance, string pluginsPath, CancellationToken cancellationToken)
     {
-        _eventStore.Append(new InstanceCreatedEvent(instance.Id));
+        await _eventStore.Append(new InstanceCreatedEvent(instance.Id));
         _logger.LogInformation("Orchestrating instance {InstanceId}", instance.Id);
 
         // Load plugins (expect exactly one matching the instance's ModuleId)
-        var modules = await _pluginLoader.LoadPluginsAsync(pluginsPath, cancellationToken);
-        var module = modules.FirstOrDefault(m => m.Id.Equals(instance.Module?.Id, StringComparison.OrdinalIgnoreCase));
+        var modules = await _pluginLoader.LoadAllPluginsAsync(cancellationToken);
+        var module = modules.FirstOrDefault(m => string.Equals(m.Id?.ToString(), instance.Module?.Id.ToString(), StringComparison.OrdinalIgnoreCase));
         if (module == null)
         {
             _logger.LogWarning("No plugin found for instance {InstanceId} (module id {ModuleId}).", instance.Id, instance.Module?.Id);
@@ -50,7 +50,7 @@ public sealed class InstanceOrchestrator
 
         // Build a simple DAG of tasks based on the module's tasks.
         var dagJobs = module.GetTasks()
-            .Select(t => new DagJob(t.Id, Array.Empty<Guid>())) // For demo, no dependencies.
+            .Select(t => new DagJob(Guid.Parse(t.Id), Array.Empty<Guid>())) // For demo, no dependencies.
             .ToList();
 
         // Run DAG jobs – each job just logs the task execution.
@@ -65,7 +65,7 @@ public sealed class InstanceOrchestrator
         // Build FSM from module states (simplified: just log entry order).
         foreach (var state in module.GetStates())
         {
-            _eventStore.Append(new StateEnteredEvent(instance.Id, state.Id));
+            await _eventStore.Append(new StateEnteredEvent(instance.Id, state.Id));
             _logger.LogInformation("Instance {InstanceId} entered state {StateId}", instance.Id, state.Id);
         }
     }

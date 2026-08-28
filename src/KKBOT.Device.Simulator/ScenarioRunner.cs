@@ -49,7 +49,7 @@ public sealed class ScenarioRunner
             };
         }
 
-        return await RunAsync(scenario, cancellationToken);
+        return await RunAsync(scenario, null, cancellationToken);
     }
 
     /// <summary>
@@ -199,7 +199,6 @@ public sealed class ScenarioRunner
         {
             stopwatch.Stop();
             stepResult.CompletedAt = DateTimeOffset.UtcNow;
-            stepResult.Duration = stopwatch.Elapsed;
         }
 
         return stepResult;
@@ -383,7 +382,7 @@ public sealed class ScenarioRunner
                     passed = EvaluateAssertion(value, step.ExpectedValue, step.Operator);
                     stepResult.Output["variable"] = step.Variable;
                     stepResult.Output["actual"] = value;
-                    stepResult.Output["expected"] = step.ExpectedValue;
+                    stepResult.Output["expected"] = step.ExpectedValue!;
                     stepResult.Output["operator"] = step.Operator.ToString();
                     
                     if (!passed)
@@ -588,7 +587,7 @@ public sealed class ScenarioRunner
 
         context.Variables[step.Name] = value!;
         stepResult.Output["variable"] = step.Name;
-        stepResult.Output["value"] = value;
+        stepResult.Output["value"] = value!;
     }
 
     private async Task ExecuteWaitForAsync(WaitForStep step, ScenarioExecutionContext context, StepExecutionResult stepResult)

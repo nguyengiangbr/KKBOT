@@ -11,7 +11,6 @@ public class InstanceTests
     {
         var instance = new Instance
         {
-            Id = Guid.NewGuid(),
             Key = "test-inst",
             DisplayName = "Test Instance",
             DeviceId = Guid.NewGuid(),
@@ -27,7 +26,6 @@ public class InstanceTests
     {
         var instance = new Instance
         {
-            Id = Guid.NewGuid(),
             Key = "test-inst",
             DisplayName = "Test Instance"
         };

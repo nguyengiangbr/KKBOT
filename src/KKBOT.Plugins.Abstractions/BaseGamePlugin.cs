@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using KKBOT.Perception.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +24,16 @@ public abstract class BaseGamePlugin : IGameModule
     private bool _initialized;
     private bool _started;
     private readonly object _stateLock = new();
+
+    #region IGameModule contract
+
+    public abstract ModuleManifest GetManifest();
+    public abstract IReadOnlyCollection<IGameDetector> GetDetectors();
+    public abstract IReadOnlyCollection<IGameTaskDefinition> GetTasks();
+    public abstract IReadOnlyCollection<IStateDefinition> GetStates();
+    public abstract Task<ModuleValidationResult> ValidateAsync(ModuleContext context, CancellationToken cancellationToken);
+
+    #endregion
 
     /// <summary>
     /// Unique identifier for the game (e.g., "volam", "mu", "silkroad").
@@ -119,7 +131,7 @@ public abstract class BaseGamePlugin : IGameModule
     /// </summary>
     protected TService GetService<TService>() where TService : class
     {
-        return _serviceProvider.GetService<TService>();
+        return _serviceProvider.GetService<TService>() ?? throw new InvalidOperationException($"Service {typeof(TService).Name} not registered.");
     }
 
     /// <summary>
@@ -666,11 +678,11 @@ internal sealed class NullLogger : ILogger
 
     private NullLogger() { }
 
-    public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
+    IDisposable? ILogger.BeginScope<TState>(TState state) => NullScope.Instance;
 
-    public bool IsEnabled(LogLevel logLevel) => false;
+    bool ILogger.IsEnabled(LogLevel logLevel) => false;
 
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
+    void ILogger.Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
 
     private sealed class NullScope : IDisposable
     {

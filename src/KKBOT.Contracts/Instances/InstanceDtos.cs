@@ -7,6 +7,17 @@ using System.Text.Json.Serialization;
 namespace KKBOT.Contracts.Instances;
 
 /// <summary>
+/// Lightweight instance DTO used for internal mapping between the domain entity and contracts.
+/// </summary>
+public sealed record InstanceDto(
+    Guid Id,
+    string Key,
+    string State,
+    Guid DeviceId,
+    Guid ModuleId,
+    Guid ProfileId);
+
+/// <summary>
 /// Request to create a new instance.
 /// </summary>
 public record CreateInstanceRequest

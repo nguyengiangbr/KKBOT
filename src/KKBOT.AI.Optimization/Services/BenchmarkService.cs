@@ -12,6 +12,7 @@ using KKBOT.AI.Optimization.Abstractions;
 using KKBOT.AI.Optimization.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace KKBOT.AI.Optimization.Services;
 
@@ -181,9 +182,23 @@ public sealed class BenchmarkService : IModelBenchmarkService
         if (File.Exists(modelPath))
         {
             var sizeMB = new FileInfo(modelPath).Length / (1024.0 * 1024.0);
-            return sizeMB * 4; // Rough estimate: 4x model size for runtime
+            return (long)(sizeMB * 4); // Rough estimate: 4x model size for runtime
         }
         return 100;
+    }
+
+    private static Tensor<float> CreateRandomTensor(int[] shape)
+    {
+        var total = 1L;
+        foreach (var d in shape)
+            total *= d > 0 ? d : 1;
+
+        var data = new float[total];
+        var random = new Random();
+        for (var i = 0; i < data.Length; i++)
+            data[i] = (float)random.NextDouble();
+
+        return new DenseTensor<float>(data, shape.Select(d => d > 0 ? d : 1).ToArray());
     }
 
     private double GetFileSizeRatio(string originalPath, string optimizedPath)

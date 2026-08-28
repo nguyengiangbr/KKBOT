@@ -12,15 +12,15 @@
   <ItemGroup>
     <ProjectReference Include="..\KKBOT.Identity\KKBOT.Identity.csproj" />
     <ProjectReference Include="..\KKBOT.Security\KKBOT.Security.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Saml2" Version="8.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="StackExchange.Redis" Version="2.7.0" />
-    <PackageReference Include="NodaTime" Version="3.1.0" />
-    <PackageReference Include="QuestPDF" Version="2023.12.0" />
-    <PackageReference Include="CsvHelper" Version="30.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Saml2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="NodaTime" />
+    <PackageReference Include="QuestPDF" />
+    <PackageReference Include="CsvHelper" />
   </ItemGroup>
 
 </Project>

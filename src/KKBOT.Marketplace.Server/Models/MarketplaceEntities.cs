@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
+using KKBOT.Marketplace.Server.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace KKBOT.Marketplace.Server.Models;
@@ -25,6 +27,8 @@ public sealed class MarketplaceDbContext : DbContext
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<SecurityScan> SecurityScans => Set<SecurityScan>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<LicensePolicyEntity> LicensePolicies => Set<LicensePolicyEntity>();
 
     public MarketplaceDbContext(DbContextOptions<MarketplaceDbContext> options) : base(options) { }
 
@@ -49,7 +53,15 @@ public sealed class MarketplaceDbContext : DbContext
             {
                 m.Property(x => x.Tags).HasColumnType("TEXT");
                 m.Property(x => x.SupportedPlatforms).HasColumnType("TEXT");
-                m.Property(x => x.SupportedResolutions).HasColumnType("TEXT");
+                m.Property(x => x.RequiredPermissions).HasColumnType("TEXT");
+                m.Property(x => x.SupportedResolutions).HasColumnType("TEXT")
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                        v => JsonSerializer.Deserialize<Resolution[]>(v, (JsonSerializerOptions?)null) ?? Array.Empty<Resolution>());
+                m.Property(x => x.CustomProperties).HasColumnType("TEXT")
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                        v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions?)null) ?? new Dictionary<string, string>());
             });
         });
 
@@ -147,7 +159,7 @@ public sealed class MarketplaceDbContext : DbContext
             e.HasIndex(p => p.CreatedAt);
             e.Property(p => p.Amount).HasPrecision(18, 2);
             e.Property(p => p.Currency).HasMaxLength(3).HasDefaultValue("USD");
-            e.Property(p => p.Status).HasMaxLength(20).HasDefaultValue("pending");
+            e.Property(p => p.Status).HasDefaultValue(PayoutStatus.Pending);
             e.Property(p => p.PayoutMethod).HasMaxLength(50);
             e.Property(p => p.TransactionId).HasMaxLength(200);
             e.HasOne(p => p.Publisher)
@@ -168,8 +180,8 @@ public sealed class MarketplaceDbContext : DbContext
             e.Property(m => m.SubmitterId).HasMaxLength(100).IsRequired();
             e.Property(m => m.Reason).HasColumnType("TEXT");
             e.Property(m => m.ModeratorNotes).HasColumnType("TEXT");
-            e.Property(m => m.Status).HasMaxLength(20).HasDefaultValue("pending");
-            e.Property(m => m.Priority).HasMaxLength(20).HasDefaultValue("normal");
+            e.Property(m => m.Status).HasDefaultValue(ModerationStatus.Pending);
+            e.Property(m => m.Priority).HasDefaultValue(ModerationPriority.Normal);
         });
 
         // PluginTag
@@ -282,12 +294,12 @@ public sealed class MarketplaceDbContext : DbContext
 
         // Seed default categories
         modelBuilder.Entity<PluginCategory>().HasData(
-            new PluginCategory { Id = 1, Name = "Game Automation", Description = "Plugins for automating specific games", Icon = "gamepad-variant", SortOrder = 1 },
-            new PluginCategory { Id = 2, Name = "AI & ML", Description = "AI models and machine learning plugins", Icon = "brain", SortOrder = 2 },
-            new PluginCategory { Id = 3, Name = "Computer Vision", Description = "OpenCV, OCR, and vision plugins", Icon = "eye", SortOrder = 3 },
-            new PluginCategory { Id = 4, Name = "Device Control", Description = "ADB, input, and device management", Icon = "cellphone-android", SortOrder = 4 },
-            new PluginCategory { Id = 5, Name = "Utility", Description = "General utility and helper plugins", Icon = "tools", SortOrder = 5 },
-            new PluginCategory { Id = 6, Name = "Scripting", Description = "Visual scripting and workflow plugins", Icon = "script-text", SortOrder = 6 }
+            new PluginCategory { Id = Guid.Parse("10000000-0000-0000-0000-000000000001"), Name = "Game Automation", Description = "Plugins for automating specific games", Icon = "gamepad-variant", SortOrder = 1 },
+            new PluginCategory { Id = Guid.Parse("20000000-0000-0000-0000-000000000002"), Name = "AI & ML", Description = "AI models and machine learning plugins", Icon = "brain", SortOrder = 2 },
+            new PluginCategory { Id = Guid.Parse("30000000-0000-0000-0000-000000000003"), Name = "Computer Vision", Description = "OpenCV, OCR, and vision plugins", Icon = "eye", SortOrder = 3 },
+            new PluginCategory { Id = Guid.Parse("40000000-0000-0000-0000-000000000004"), Name = "Device Control", Description = "ADB, input, and device management", Icon = "cellphone-android", SortOrder = 4 },
+            new PluginCategory { Id = Guid.Parse("50000000-0000-0000-0000-000000000005"), Name = "Utility", Description = "General utility and helper plugins", Icon = "tools", SortOrder = 5 },
+            new PluginCategory { Id = Guid.Parse("60000000-0000-0000-0000-000000000006"), Name = "Scripting", Description = "Visual scripting and workflow plugins", Icon = "script-text", SortOrder = 6 }
         );
     }
 }
@@ -353,6 +365,7 @@ public sealed class PluginVersion
     public VersionStatus Status { get; set; } = VersionStatus.Pending;
     public string? DeprecationNotice { get; set; }
     public DateTime? DeprecatedAt { get; set; }
+    public long DownloadCount { get; set; } = 0;
 
     // Navigation
     public ICollection<PluginDependency> Dependencies { get; set; } = new List<PluginDependency>();
@@ -528,7 +541,7 @@ public sealed class WebhookSubscription
     public int RetryCount { get; set; } = 0;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastTriggeredAt { get; set; }
-    public int FailureCount { get; set; } = 0
+    public int FailureCount { get; set; } = 0;
     public ICollection<WebhookDelivery> Deliveries { get; set; } = new List<WebhookDelivery>();
 }
 
@@ -539,7 +552,7 @@ public sealed class WebhookDelivery
     public WebhookSubscription WebhookSubscription { get; set; } = null!;
     public string EventType { get; set; } = string.Empty;
     public string Payload { get; set; } = string.Empty;
-    public int ResponseStatus { get; set; }
+    public string ResponseStatus { get; set; } = string.Empty;
     public string ResponseBody { get; set; } = string.Empty;
     public int AttemptCount { get; set; } = 0;
     public string ErrorMessage { get; set; } = string.Empty;
@@ -562,6 +575,33 @@ public sealed class SecurityScan
     public string BehaviorJson { get; set; } = "{}";
     public long ScanDurationMs { get; set; }
     public string ScannerVersion { get; set; } = "1.0.0";
+}
+
+public sealed class User
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class LicensePolicyEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string PolicyId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string LicenseId { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public List<string> AllowedLicenses { get; set; } = new();
+    public List<string> DisallowedLicenses { get; set; } = new();
+    public bool RequireCopyleftApproval { get; set; }
+    public bool RequirePatentGrant { get; set; }
+    public bool BlockOnConflict { get; set; }
+    public List<string> Rules { get; set; } = new();
 }
 
 // Enums

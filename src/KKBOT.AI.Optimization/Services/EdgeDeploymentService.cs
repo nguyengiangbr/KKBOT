@@ -150,7 +150,7 @@ public sealed class EdgeDeploymentService : IEdgeDeploymentService
 
         // Generate mock health data
         var random = new Random();
-        var health = new DeviceHealth
+        var deviceHealth = new DeviceHealth
         {
             DeviceId = deviceId,
             IsOnline = true,
@@ -167,15 +167,15 @@ public sealed class EdgeDeploymentService : IEdgeDeploymentService
             Alerts = new List<string>()
         };
 
-        if (health.TemperatureCelsius > 80)
-            health.Alerts.Add("High temperature detected");
-        if (health.MemoryUsagePercent > 90)
-            health.Alerts.Add("High memory usage");
-        if (health.DiskUsagePercent > 90)
-            health.Alerts.Add("Low disk space");
+        if (deviceHealth.TemperatureCelsius > 80)
+            deviceHealth.Alerts.Add("High temperature detected");
+        if (deviceHealth.MemoryUsagePercent > 90)
+            deviceHealth.Alerts.Add("High memory usage");
+        if (deviceHealth.DiskUsagePercent > 90)
+            deviceHealth.Alerts.Add("Low disk space");
 
-        _deviceHealth[deviceId] = health;
-        return health;
+        _deviceHealth[deviceId] = deviceHealth;
+        return deviceHealth;
     }
 
     public async Task<List<DeploymentPackage>> ListDeploymentsAsync(string deviceId, CancellationToken ct = default)

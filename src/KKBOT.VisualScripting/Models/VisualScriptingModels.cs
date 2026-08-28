@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace KKBOT.VisualScripting;
 
@@ -365,7 +366,6 @@ public sealed class NodeExecutionContext
     public IServiceProvider Services { get; set; } = null!;
     public ILogger Logger { get; set; } = null!;
     public CancellationToken CancellationToken { get; set; }
-    public Dictionary<string, object> Services { get; set; } = new();
     public INodeOutputCollector OutputCollector { get; set; } = null!;
 }
 

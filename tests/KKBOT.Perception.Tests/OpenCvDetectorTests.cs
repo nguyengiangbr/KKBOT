@@ -8,7 +8,7 @@ using KKBOT.Perception.OpenCv;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace KKBOT.Perception.Tests;
+namespace KKBOT.Perception.Tests
 {
     public class OpenCvDetectorTests
     {

@@ -12,14 +12,24 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using KKBOT.Plugins.Abstractions;
+using KKBOT.Security;
 
 namespace KKBOT.Plugins.Loader;
 
 /// <summary>
+/// Abstraction over <see cref="PluginLoader"/> used by consumers that only need a
+/// loader reference (e.g. installers) without coupling to the concrete, sealed type.
+/// </summary>
+public interface IPluginLoader
+{
+}
+
+/// <summary>
 /// Plugin loader with AssemblyLoadContext isolation for hot-reload and security.
 /// </summary>
-public sealed class PluginLoader : IDisposable
+public sealed class PluginLoader : IPluginLoader, IDisposable
 {
     private readonly ILogger<PluginLoader> _logger;
     private readonly PluginLoaderOptions _options;
@@ -111,8 +121,8 @@ public sealed class PluginLoader : IDisposable
                 }
             }
 
-            // Create isolated load context
-            var loadContext = new PluginLoadContext(assemblyPath, _options.PluginDirectory);
+            // Create isolated load context (shared contract assemblies load from the default ALC)
+            var loadContext = new PluginLoadContext(assemblyPath, _options.PluginDirectory, PluginLoadContext.DefaultSharedAssemblies);
             var assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
 
             // Find and instantiate IGameModule implementation
@@ -138,18 +148,18 @@ public sealed class PluginLoader : IDisposable
                 if (constructor != null)
                 {
                     var logger = _loggerFactory.CreateLogger(pluginType);
-                    pluginInstance = (IGameModule)constructor.Invoke(new object[] { logger, _serviceProvider });
+                    pluginInstance = (IGameModule)constructor.Invoke(new object[] { logger, _serviceProvider })!;
                 }
                 else
                 {
                     // Fallback to parameterless constructor
-                    pluginInstance = (IGameModule)Activator.CreateInstance(pluginType);
+                    pluginInstance = (IGameModule)Activator.CreateInstance(pluginType)!;
                 }
             }
             else
             {
                 // For legacy IGameModule implementations
-                pluginInstance = (IGameModule)Activator.CreateInstance(pluginType);
+                pluginInstance = (IGameModule)Activator.CreateInstance(pluginType)!;
             }
 
             // Initialize the plugin
@@ -159,8 +169,9 @@ public sealed class PluginLoader : IDisposable
             _loadContexts.TryAdd(assemblyName, loadContext);
             _loadedPlugins.TryAdd(assemblyName, pluginInstance);
 
-            _logger.LogInformation("Successfully loaded plugin {PluginName} ({GameId}) v{Version}", 
-                pluginInstance.GameName, pluginInstance.GameId, pluginInstance.Version);
+            var loadedManifest = pluginInstance.GetManifest();
+            _logger.LogInformation("Successfully loaded plugin {PluginName} ({GameId}) v{Version}",
+                loadedManifest.Name, loadedManifest.Id, pluginInstance.Version);
 
             return pluginInstance;
         }
@@ -183,7 +194,7 @@ public sealed class PluginLoader : IDisposable
             try
             {
                 plugin.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
-                plugin.Dispose();
+                (plugin as IDisposable)?.Dispose();
             }
             catch (Exception ex)
             {
@@ -229,15 +240,24 @@ public sealed class PluginLoader : IDisposable
     /// </summary>
     public IReadOnlyList<PluginInfo> GetLoadedPlugins()
     {
-        return _loadedPlugins.Values.Select(p => new PluginInfo
+        return _loadedPlugins.Values.Select(p =>
         {
-            Name = p.GameName,
-            GameId = p.GameId,
-            Version = p.Version,
-            IsInitialized = true,
-            IsStarted = true,
+            var m = p.GetManifest();
+            return new PluginInfo
+            {
+                Name = m.Name,
+                GameId = m.Id,
+                Version = p.Version,
+                IsInitialized = true,
+                IsStarted = true,
+            };
         }).ToList().AsReadOnly();
     }
+
+    /// <summary>
+    /// Returns the live plugin module instances, used by the operator UI to host per-plugin configuration views.
+    /// </summary>
+    public IReadOnlyList<IGameModule> GetLoadedPluginInstances() => _loadedPlugins.Values.ToList().AsReadOnly();
 
     /// <summary>
     /// Gets a loaded plugin by game ID.
@@ -297,16 +317,42 @@ public sealed class PluginLoadContext : AssemblyLoadContext
 {
     private readonly AssemblyDependencyResolver _resolver;
     private readonly string _pluginDirectory;
+    private readonly ISet<string> _sharedAssemblies;
 
-    public PluginLoadContext(string pluginPath, string pluginDirectory) 
+    public PluginLoadContext(string pluginPath, string pluginDirectory, ISet<string>? sharedAssemblies = null)
         : base(isCollectible: true)
     {
         _pluginDirectory = pluginDirectory;
         _resolver = new AssemblyDependencyResolver(pluginPath);
+        _sharedAssemblies = sharedAssemblies ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Assembly simple names that must load from the default (host) ALC so that shared
+    /// contract types (IGameModule, IPluginWpfUi, ...) keep a single identity across plugins.
+    /// </summary>
+    public static ISet<string> DefaultSharedAssemblies { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "KKBOT.Plugins.Abstractions",
+        "KKBOT.Plugins.Wpf",
+        "KKBOT.Navigation",
+        "KKBOT.Device.Abstractions",
+        "KKBOT.Perception.Abstractions",
+        "KKBOT.AI.Abstractions",
+    };
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
+        // Framework and shared contract assemblies are served by the default ALC to preserve
+        // type identity (otherwise interface casts across the plugin boundary fail).
+        if (DefaultSharedAssemblies.Contains(assemblyName.Name!)
+            || _sharedAssemblies.Contains(assemblyName.Name!)
+            || assemblyName.Name!.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase)
+            || assemblyName.Name!.StartsWith("System.", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
         if (assemblyPath != null)
         {
@@ -374,8 +420,8 @@ public static class PluginLoaderExtensions
     public static IServiceCollection AddPluginLoader(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<PluginLoaderOptions>(configuration.GetSection("PluginLoader"));
+        services.AddSingleton<PluginSigningValidator>();
         services.AddSingleton<PluginLoader>();
-        services.AddHostedService(sp => sp.GetRequiredService<PluginLoader>());
         return services;
     }
 }

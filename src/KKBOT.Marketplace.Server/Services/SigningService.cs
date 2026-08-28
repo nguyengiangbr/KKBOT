@@ -43,14 +43,15 @@ public sealed class SigningService : ISigningService
 
         // Load signing key (in production, use HSM or Azure Key Vault)
         var signingKey = LoadSigningKey();
-        
+
         // Create signature using RSA-SHA256
-        using var rsa = signingKey.GetRSAPrivateKey() ?? throw new InvalidOperationException("No private key available");
+        using var rsa = signingKey;
         var signatureBytes = rsa.SignData(pluginData, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         var signatureBase64 = Convert.ToBase64String(signatureBytes);
 
         // Get certificate for verification
-        var certificate = signingKey.CopyWithPrivateKey(rsa);
+        var certRequest = new CertificateRequest("CN=KKBOT Plugin Signing", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var certificate = certRequest.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(10));
         var certPem = ExportCertificateToPem(certificate);
         var publicKeyPem = ExportPublicKeyToPem(rsa);
 
@@ -197,28 +198,13 @@ public sealed class SigningService : ISigningService
     {
         try
         {
-            var doc = JsonDocument.Parse(manifestJson);
-            var root = doc.RootElement;
-            
-            var newRoot = JsonSerializer.Serialize(new
-            {
-                root.GetProperty("pluginId"),
-                root.GetProperty("name"),
-                root.GetProperty("version"),
-                root.GetProperty("author"),
-                root.GetProperty("description"),
-                root.GetProperty("entryAssembly"),
-                root.GetProperty("assets"),
-                root.GetProperty("dependencies"),
-                root.GetProperty("configSchema"),
-                root.GetProperty("defaultConfig"),
-                root.GetProperty("supportedResolutions"),
-                root.GetProperty("requiredPermissions"),
-                fileHash = hashBase64,
-                signedAt = DateTime.UtcNow
-            });
+            var obj = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(manifestJson)
+                ?? new Dictionary<string, JsonElement>();
 
-            return newRoot;
+            obj["fileHash"] = JsonSerializer.SerializeToElement(hashBase64);
+            obj["signedAt"] = JsonSerializer.SerializeToElement(DateTime.UtcNow);
+
+            return JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
         }
         catch
         {

@@ -18,16 +18,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
-    <PackageReference Include="Microsoft.ML" Version="3.0.0" />
-    <PackageReference Include="Microsoft.ML.TimeSeries" Version="3.0.0" />
-    <PackageReference Include="Microsoft.ML.AutoML" Version="3.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="QuestPDF" Version="2023.12.0" />
-    <PackageReference Include="Apache.Arrow" Version="15.0.0" />
-    <PackageReference Include="Apache.Parquet" Version="15.0.0" />
-    <PackageReference Include="Polly" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.ML" />
+    <PackageReference Include="Microsoft.ML.TimeSeries" />
+    <PackageReference Include="Microsoft.ML.AutoML" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="QuestPDF" />
+    <PackageReference Include="Apache.Arrow" />
+    <PackageReference Include="Apache.Parquet" />
+    <PackageReference Include="Polly" />
   </ItemGroup>
 
 </Project>

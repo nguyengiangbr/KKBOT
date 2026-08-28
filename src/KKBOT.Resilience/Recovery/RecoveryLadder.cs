@@ -5,6 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -29,7 +32,7 @@ public enum RecoveryLevel
 /// </summary>
 public sealed class RecoveryResult
 {
-    public bool Success { get; init; }
+    public bool IsSuccess { get; init; }
     public RecoveryLevel Level { get; init; }
     public string Message { get; init; } = string.Empty;
     public Exception? Exception { get; init; }
@@ -40,7 +43,7 @@ public sealed class RecoveryResult
     {
         return new RecoveryResult
         {
-            Success = true,
+            IsSuccess = true,
             Level = level,
             Message = message,
             Duration = duration,
@@ -52,7 +55,7 @@ public sealed class RecoveryResult
     {
         return new RecoveryResult
         {
-            Success = false,
+            IsSuccess = false,
             Level = level,
             Message = message,
             Exception = exception,
@@ -79,7 +82,7 @@ public sealed class RecoveryLadderOptions
 /// <summary>
 /// Recovery ladder for automatic error recovery with escalating levels.
 /// </summary>
-public sealed class RecoveryLadder
+public sealed class RecoveryLadder : IHostedService
 {
     private readonly ILogger<RecoveryLadder> _logger;
     private readonly RecoveryLadderOptions _options;
@@ -102,6 +105,10 @@ public sealed class RecoveryLadder
         // Register default recovery actions
         RegisterDefaultActions();
     }
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>
     /// Registers a recovery action for a specific level.
@@ -179,7 +186,7 @@ public sealed class RecoveryLadder
                             },
                             CancellationToken.None);
 
-                        if (result.Success)
+                        if (result.IsSuccess)
                         {
                             success = true;
                             break;
@@ -443,20 +450,6 @@ public class RecoveryException : Exception
 {
     public RecoveryException(string message) : base(message) { }
     public RecoveryException(string message, Exception inner) : base(message, inner) { }
-}
-
-/// <summary>
-/// Options for recovery ladder.
-/// </summary>
-public sealed class RecoveryLadderOptions
-{
-    public int MaxRetriesPerLevel { get; set; } = 3;
-    public TimeSpan BaseDelay { get; set; } = TimeSpan.FromSeconds(1);
-    public double BackoffMultiplier { get; set; } = 2.0;
-    public TimeSpan MaxDelay { get; set; } = TimeSpan.FromMinutes(5);
-    public TimeSpan CooldownPeriod { get; set; } = TimeSpan.FromMinutes(5);
-    public bool EnableAutoRecovery { get; set; } = true;
-    public int MaxRecoveryAttemptsPerHour { get; set; } = 10;
 }
 
 /// <summary>

@@ -50,10 +50,6 @@ public sealed class PiiRedactionMiddleware
         new Regex(@"\b\d{4}[- ]\d{4}[- ]\d{4}[- ]\d{4}\b", RegexOptions.Compiled),
     };
 
-    private readonly RequestDelegate _next;
-    private readonly ILogger<PiiRedactionMiddleware> _logger;
-    private readonly PiiRedactionOptions _options;
-
     public PiiRedactionMiddleware(
         RequestDelegate next,
         ILogger<PiiRedactionMiddleware> logger,

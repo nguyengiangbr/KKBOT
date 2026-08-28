@@ -5,9 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using KKBOT.Marketplace.Server.Models;
 using KKBOT.Marketplace.Server.Services;
-using KKBOT.PluginMarketplace;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -19,11 +19,11 @@ public class MarketplaceServerTests
     private static ServiceProvider CreateProvider()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<MarketplaceDbContext>(options => options.UseSqlite("DataSource=:memory:"));
+        var dbPath = Path.Combine(Path.GetTempPath(), "kkbot-mps-" + Guid.NewGuid().ToString("N") + ".db");
+        services.AddDbContext<MarketplaceDbContext>(options => options.UseSqlite("DataSource=" + dbPath));
         services.AddLogging(b => b.AddConsole());
         
         // Storage
-        services.Configure<StorageOptions>(o => o.StoragePath = Path.GetTempPath());
         services.AddSingleton<IStorageService, LocalStorageService>();
         
         // Signing
@@ -38,7 +38,6 @@ public class MarketplaceServerTests
         // Ensure database created
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
-        db.Database.OpenConnection();
         db.Database.EnsureCreated();
         
         return provider;
@@ -65,7 +64,7 @@ public class MarketplaceServerTests
         Assert.NotNull(publisher);
         Assert.Equal("Test Publisher", publisher.Name);
         Assert.Equal("user-123", publisher.UserId);
-        Assert.Equal("verified", publisher.VerificationStatus); // Will be "pending" initially
+        Assert.Equal("pending", publisher.VerificationStatus);
     }
 
     [Fact]
@@ -165,6 +164,13 @@ public class MarketplaceServerTests
             new PluginPublishRequest("com.search.plugin", "Searchable Plugin", "A plugin for search testing", "", "", "", "MIT",
                 new[] { "search", "test" }, Array.Empty<string>(), Array.Empty<Resolution>(), Array.Empty<string>()),
             publisher.Id.ToString(), CancellationToken.None);
+
+        // Search only returns public, published plugins - promote the draft so it is discoverable
+        var db = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
+        var plugin = await db.PluginPackages.FirstAsync(p => p.PluginId == "com.search.plugin", CancellationToken.None);
+        plugin.Visibility = "public";
+        plugin.Status = PluginStatus.Published;
+        await db.SaveChangesAsync(CancellationToken.None);
 
         // Search
         var query = new PluginSearchQuery
@@ -303,7 +309,7 @@ public class StorageServiceTests
         _testStoragePath = Path.Combine(Path.GetTempPath(), "kkbot-storage-test", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testStoragePath);
 
-        var options = Options.Create(new StorageOptions { StoragePath = _testStoragePath });
+        var options = Options.Create(new StorageOptions());
         _storage = new LocalStorageService(NullLogger<LocalStorageService>.Instance, options);
     }
 

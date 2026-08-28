@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using KKBOT.Collaboration.Abstractions;
+using KKBOT.Collaboration.Hubs;
 using KKBOT.Collaboration.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -425,7 +426,7 @@ public sealed class CollaborationController : ControllerBase
     public async Task<ActionResult<ScreenAnnotation>> CreateAnnotation(Guid sessionId, [FromBody] CreateAnnotationRequest request, CancellationToken ct)
     {
         var annotation = await _annotationService.CreateAnnotationAsync(sessionId, request, GetCurrentUserId(), ct);
-        return CreatedAtAction(nameof(GetAnnotation), new { sessionId, annotationId = annotation.Id }, annotation);
+        return CreatedAtAction(nameof(GetAnnotations), new { sessionId }, annotation);
     }
 
     [HttpGet("sessions/{sessionId}/annotations")]

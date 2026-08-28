@@ -106,13 +106,16 @@ public sealed class ModelRegistry : IModelRegistry
         return true;
     }
 
-    public async Task<bool> DeleteModelAsync(string modelId, string version, CancellationToken ct = default)
+    public async Task<bool> DeleteModelAsync(string modelId, string? version = null, CancellationToken ct = default)
     {
-        var removed = _models.TryRemove(GetKey(modelId, version), out _);
+        var removed = _models.TryRemove(GetKey(modelId, version!), out _);
         if (removed)
             await SaveRegistryAsync(ct);
         return removed;
     }
+
+    Task<ModelSpec?> IModelRegistry.GetModelAsync(string modelId, CancellationToken ct) => GetModelAsync(modelId, null, ct);
+    Task<bool> IModelRegistry.DeleteModelAsync(string modelId, CancellationToken ct) => DeleteModelAsync(modelId, null, ct);
 
     public async Task<ModelSpec> PromoteModelAsync(string modelId, string version, ModelStage stage, CancellationToken ct = default)
     {

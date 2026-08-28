@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using KKBOT.VisualScripting;
 using KKBOT.VisualScripting.Engine;
-using KKBOT.VisualScripting.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -16,7 +16,7 @@ public class VisualScriptingEngineTests
     private static ServiceProvider CreateProvider()
     {
         var services = new ServiceCollection();
-        services.AddLogging(b => b.AddConsole());
+        services.AddLogging();
         services.Configure<VisualScriptingOptions>(o => o.DefaultNodeTimeoutSeconds = 5);
         services.AddSingleton<IVisualScriptingEngine, VisualScriptingEngine>();
         var provider = services.BuildServiceProvider();
@@ -126,7 +126,7 @@ public class VisualScriptingEngineTests
                     {
                         ["input"] = new NodePort { Id = "input", Name = "Value", DataType = PortDataType.Boolean, IsRequired = true }
                     },
-                    OutputPorts = new Dictionary<string, NodePort>
+                    Outputs = new Dictionary<string, NodePort>
                     {
                         ["true"] = new NodePort { Id = "true", Name = "True", DataType = PortDataType.Any },
                         ["false"] = new NodePort { Id = "false", Name = "False", DataType = PortDataType.Any }
@@ -235,7 +235,7 @@ public class VisualScriptingEngineTests
                     Position = new NodePosition { X = 300, Y = 100 },
                     Inputs = new Dictionary<string, NodePort>
                     {
-                        ["value"] = new NodePort { Id = "value", DataType = PortDataType.String, IsRequired = true },
+                        ["value"] = new NodePort { Id = "value", DataType = PortDataType.String, IsRequired = true, DefaultValue = "Hello World" },
                         ["trigger"] = new NodePort { Id = "trigger", DataType = PortDataType.Any }
                     },
                     Outputs = new Dictionary<string, NodePort> { ["output"] = new NodePort { Id = "output", DataType = PortDataType.Any } },

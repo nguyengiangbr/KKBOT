@@ -15,22 +15,6 @@ namespace KKBOT.AI.Optimization.Tests;
 
 public class OptimizationTests
 {
-    private static ServiceProvider CreateProvider()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging(b => b.AddConsole());
-        services.Configure<OptimizationOptions>(o => 
-        {
-            o.DefaultTimeoutMinutes = 10;
-            o.MaxConcurrentOptimizations = 2;
-            o.FailOnAccuracyDrop = false; // For testing
-        });
-        services.AddSingleton<MLContext>();
-        
-        var provider = services.BuildServiceProvider();
-        return provider;
-    }
-
     [Fact]
     public void OptimizationConfig_Defaults()
     {
@@ -185,14 +169,16 @@ public class OptimizationTests
     {
         var pipeline = new OptimizationPipeline
         {
+            PipelineId = "stage-ordering",
+            Name = "Stage Ordering",
             Steps = new List<PipelineStep>
             {
-                new PipelineStep { StepId = "a", Name = "A", Stage = OptimizationStage.GraphOptimization, DependsOn = new() },
+                new PipelineStep { StepId = "a", Name = "A", Stage = OptimizationStage.GraphOptimization },
                 new PipelineStep { StepId = "b", Name = "B", Stage = OptimizationStage.Quantization, DependsOn = new() { "a" } },
                 new PipelineStep { StepId = "c", Name = "C", Stage = OptimizationStage.CodeGeneration, DependsOn = new() { "b" } }
-            };
+            }
+        };
 
-        // Verify dependencies are set correctly
         var stepA = pipeline.Steps.First(s => s.StepId == "a");
         var stepB = pipeline.Steps.First(s => s.StepId == "b");
         var stepC = pipeline.Steps.First(s => s.StepId == "c");

@@ -78,34 +78,34 @@ public sealed class EventUpcaster : IEventUpcaster
         // InstanceCreatedEvent v1 -> v2: Added ModuleVersion field
         RegisterUpcaster("InstanceCreatedEvent", 1, 2, new JsonUpcastStep((json, ct) =>
         {
-            var node = JsonNode.Parse(json);
+            var node = json;
             if (node?["ModuleVersion"] == null)
             {
                 node!["ModuleVersion"] = "1.0.0";
             }
-            return Task.FromResult(node!.ToJsonString());
+            return Task.FromResult(node!);
         }));
 
         // JobCompletedEvent v1 -> v2: Added DurationMs field
         RegisterUpcaster("JobCompletedEvent", 1, 2, new JsonUpcastStep((json, ct) =>
         {
-            var node = JsonNode.Parse(json);
+            var node = json;
             if (node?["DurationMs"] == null)
             {
                 node!["DurationMs"] = 0;
             }
-            return Task.FromResult(node!.ToJsonString());
+            return Task.FromResult(node!);
         }));
 
         // StateEnteredEvent v1 -> v2: Added PerceptionData field
         RegisterUpcaster("StateEnteredEvent", 1, 2, new JsonUpcastStep((json, ct) =>
         {
-            var node = JsonNode.Parse(json);
+            var node = json;
             if (node?["PerceptionData"] == null)
             {
                 node!["PerceptionData"] = new JsonObject();
             }
-            return Task.FromResult(node!.ToJsonString());
+            return Task.FromResult(node!);
         }));
 
         _logger.LogInformation("Registered {Count} default event upcasters", 3);
@@ -125,7 +125,7 @@ public sealed class EventUpcaster : IEventUpcaster
 /// <summary>
 /// Single upcast step.
 /// </summary>
-public sealed record UpcastStep
+public class UpcastStep
 {
     public string Name { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
@@ -144,7 +144,8 @@ public sealed class JsonUpcastStep : UpcastStep
         _transform = transform;
         UpcastAsync = async (json, ct) =>
         {
-            var node = JsonNode.Parse(json);
+            var node = json;
+            if (node is null) return json;
             var transformed = await _transform(node, ct);
             return transformed.ToJsonString();
         };

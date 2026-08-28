@@ -1,33 +1,6 @@
 // Copyright (c) KKBOT. All rights reserved.
-// Licensed under the MIT License.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using KKBOT.Device.Abstractions;
-
-namespace KKBOT.Device.Simulator;
-
-/// <summary>
-/// Represents a simple simulation scenario.
-/// The file is JSON (or YAML) where each step describes an action.
-/// </summary>
-public sealed class SimulationScenario
-{
-    public List<ScenarioStep> Steps { get; set; } = new();
-}
-
-public sealed class ScenarioStep
-{
-    /// <summary>
-    /// Action to perform: "capture", "input", "delay".
-    /// </summary>
-    public string Action { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Optional delay before executing this step (milliseconds).
-    /// </summary>
-    public int? DelayMs { get; set; }
-
-    /// <summary>
-    /// Optional input command (used when Action=="input").
-    /// </summary>
-    public InputCommand? Input { get; set; }
-}
+// The scenario model types (SimulationScenario, ScenarioStep and its derived
+// step types) are defined in ScenarioModels.cs. This file is intentionally left
+// without duplicate type definitions to avoid CS0101 / CS0509 conflicts.

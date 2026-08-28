@@ -240,22 +240,18 @@ public sealed class IdentityService
             .Distinct()
             .ToArray();
 
-        return new TokenResponse
-        {
-            AccessToken = token,
-            ExpiresIn = int.Parse(_configuration["Jwt:ExpiryMinutes"] ?? "60") * 60,
-            TokenType = "Bearer",
-            User = new UserInfo
-            {
-                Id = user.Id,
-                Email = user.Email ?? string.Empty,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                TenantId = user.TenantId,
-                Roles = roles.ToArray(),
-                Permissions = permissions
-            }
-        };
+        return new TokenResponse(
+            token,
+            int.Parse(_configuration["Jwt:ExpiryMinutes"] ?? "60") * 60,
+            "Bearer",
+            new UserInfo(
+                user.Id,
+                user.Email ?? string.Empty,
+                user.FirstName,
+                user.LastName,
+                user.TenantId,
+                roles.ToArray(),
+                permissions));
     }
 
     public async Task<TokenResponse?> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)

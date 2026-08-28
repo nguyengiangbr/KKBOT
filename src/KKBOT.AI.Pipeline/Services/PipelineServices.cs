@@ -435,38 +435,40 @@ public sealed class LocalInferenceEngine : IInferenceEngine
     public async IAsyncEnumerable<InferenceStreamChunk> PredictStreamAsync(InferenceRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         _logger.LogInformation("Starting streaming inference for model {ModelId} v{Version}", request.ModelId, request.ModelVersion);
-        
+
         var modelInfo = await GetOrLoadModelAsync(request.ModelId, request.ModelVersion, ct);
         var modelMetadata = await _modelRegistry.GetModelAsync(request.ModelId, request.ModelVersion, ct);
-        
+
         var startTime = DateTime.UtcNow;
         var requestId = request.RequestId ?? Guid.NewGuid().ToString();
-        
+
+        var chunks = new List<InferenceStreamChunk>();
+
         try
         {
             // Simulate streaming response based on model type
             string fullResponse = "";
-            
+
             if (modelMetadata?.Type == ModelType.TextGeneration)
             {
                 // Simulate token-by-token generation
                 var mockText = "This is a generated response from the model. ";
                 var tokens = mockText.Split(' ');
-                
+
                 foreach (var token in tokens)
                 {
                     if (ct.IsCancellationRequested) break;
-                    
+
                     fullResponse += token + " ";
-                    yield return new InferenceStreamChunk(
+                    chunks.Add(new InferenceStreamChunk(
                         token + " ",
                         false,
-                        new Dictionary<string, object> 
-                        { 
+                        new Dictionary<string, object>
+                        {
                             ["tokens_generated"] = fullResponse.Split(' ').Length - 1,
                             ["model_id"] = request.ModelId
-                        });
-                    
+                        }));
+
                     await Task.Delay(50, ct); // Simulate token generation delay
                 }
             }
@@ -474,13 +476,13 @@ public sealed class LocalInferenceEngine : IInferenceEngine
             {
                 // For non-text models, yield the full response at once
                 var response = await PredictAsync(request, ct);
-                fullResponse = System.Text.Json.JsonSerializer.Serialize(response.Output);
-                yield return new InferenceStreamChunk(fullResponse, true, new Dictionary<string, object> { ["final"] = true });
+                fullResponse = System.Text.Json.JsonSerializer.Serialize(response.Outputs);
+                chunks.Add(new InferenceStreamChunk(fullResponse, true, new Dictionary<string, object> { ["final"] = true }));
             }
 
             // Final chunk with metrics
             var totalLatency = (DateTime.UtcNow - startTime).TotalMilliseconds;
-            yield return new InferenceStreamChunk(
+            chunks.Add(new InferenceStreamChunk(
                 "",
                 true,
                 new Dictionary<string, object>
@@ -488,15 +490,20 @@ public sealed class LocalInferenceEngine : IInferenceEngine
                     ["final"] = true,
                     ["total_latency_ms"] = totalLatency,
                     ["tokens_total"] = fullResponse.Split(' ').Length
-                });
+                }));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Streaming inference failed for request {RequestId}", requestId);
-            yield return new InferenceStreamChunk(
+            chunks.Add(new InferenceStreamChunk(
                 $"Error: {ex.Message}",
                 true,
-                new Dictionary<string, object> { ["error"] = true, ["message"] = ex.Message });
+                new Dictionary<string, object> { ["error"] = true, ["message"] = ex.Message }));
+        }
+
+        foreach (var chunk in chunks)
+        {
+            yield return chunk;
         }
     }
 
@@ -593,6 +600,22 @@ public sealed class LocalModelDeploymentService : IModelDeploymentService
     {
         _logger = logger;
         _modelRegistry = modelRegistry;
+    }
+
+    public Task<ModelDeployment> DeployModelAsync(DeployModelRequest request, CancellationToken ct = default)
+        => DeployAsync(request, ct);
+
+    public Task<IReadOnlyList<DeploymentLog>> GetDeploymentLogsAsync(string deploymentId, int lines = 100, CancellationToken ct = default)
+    {
+        _deployments.TryGetValue(deploymentId, out var deployment);
+
+        var logs = new List<DeploymentLog>
+        {
+            new(deploymentId, $"pod-{deploymentId[..Math.Min(8, deploymentId.Length)]}", "Deployment initialized", "Info", DateTime.UtcNow),
+            new(deploymentId, $"pod-{deploymentId[..Math.Min(8, deploymentId.Length)]}", deployment == null ? "Deployment not found" : $"Deployment status: {deployment.Status}", "Info", DateTime.UtcNow)
+        };
+
+        return Task.FromResult<IReadOnlyList<DeploymentLog>>(logs.Take(lines).ToList());
     }
 
     public async Task<ModelDeployment> DeployAsync(DeployModelRequest request, CancellationToken ct = default)

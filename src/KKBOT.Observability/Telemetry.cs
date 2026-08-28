@@ -1,16 +1,18 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using System.Diagnostics;
 using Serilog;
 using Serilog.Events;
 using KKBOT.Observability.Logging;
 using KKBOT.Observability.Metrics;
-using KKBOT.Observability.Tracing;
 
 namespace KKBOT.Observability;
 
@@ -110,41 +112,6 @@ public static class TelemetryExtensions
         app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
         return app;
-    }
-}
-
-/// <summary>
-/// Configures OpenTelemetry Prometheus scraping endpoint.
-/// </summary>
-public static class PrometheusEndpointExtensions
-{
-    public static IApplicationBuilder UseOpenTelemetryPrometheusScrapingEndpoint(this IApplicationBuilder app)
-    {
-        return app.UseOpenTelemetryPrometheusScrapingEndpoint("/metrics");
-    }
-
-    public static IApplicationBuilder UseOpenTelemetryPrometheusScrapingEndpoint(this IApplicationBuilder app, string path)
-    {
-        app.Map(path, metricsApp =>
-        {
-            metricsApp.Run(async context =>
-            {
-                var meterProvider = context.RequestServices.GetService<MeterProvider>();
-                if (meterProvider is null)
-                {
-                    context.Response.StatusCode = 503;
-                    await context.Response.WriteAsync("Metrics not available");
-                    return;
-                }
-
-                context.Response.ContentType = "text/plain; version=0.0.4; charset=utf-8";
-                
-                // The OpenTelemetry Prometheus exporter handles this automatically
-                // when AddPrometheusExporter is configured with StartHttpListener = true
-                await context.Response.WriteAsync("# Metrics served by OpenTelemetry Prometheus Exporter
-");
-            });
-        });
     }
 }
 

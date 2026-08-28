@@ -385,7 +385,7 @@ public sealed class ModelOptimizer : IModelOptimizer
         };
 
         var outputPath = Path.ChangeExtension(modelPath, ".trt");
-        return await _modelConverter.ConvertToTensorRTAsync(modelPath, outputPath, 
+        return await _converter.ConvertToTensorRTAsync(modelPath, outputPath, 
             new TensorRTConversionOptions
             {
                 Precision = options.Precision,
@@ -399,7 +399,7 @@ public sealed class ModelOptimizer : IModelOptimizer
     private async Task<string> ConvertToCoreMLAsync(string modelPath, OptimizationConfig config, CancellationToken ct)
     {
         var outputPath = Path.ChangeExtension(modelPath, ".mlmodel");
-        return await _modelConverter.ConvertToCoreMLAsync(modelPath, outputPath, 
+        return await _converter.ConvertToCoreMLAsync(modelPath, outputPath, 
             new CoreMLConversionOptions
             {
                 Precision = config.Quantization.Mode == PrecisionMode.Int8 ? PrecisionMode.Int8 : 
@@ -412,7 +412,7 @@ public sealed class ModelOptimizer : IModelOptimizer
     private async Task<string> ConvertToTFLiteAsync(string modelPath, OptimizationConfig config, CancellationToken ct)
     {
         var outputPath = Path.ChangeExtension(modelPath, ".tflite");
-        return await _modelConverter.ConvertToTFLiteAsync(modelPath, outputPath,
+        return await _converter.ConvertToTFLiteAsync(modelPath, outputPath,
             new TFLiteConversionOptions
             {
                 Precision = config.Quantization.Mode,
@@ -423,7 +423,7 @@ public sealed class ModelOptimizer : IModelOptimizer
     private async Task RunVerificationAsync(string modelPath, OptimizationConfig config, CancellationToken ct)
     {
         // Verify model correctness
-        var spec = await _modelConverter.GetModelSpecAsync(modelPath, ct);
+        var spec = await _converter.GetModelSpecAsync(modelPath, ct);
         if (spec == null)
             throw new InvalidOperationException("Model verification failed: could not load model");
     }
@@ -432,7 +432,7 @@ public sealed class ModelOptimizer : IModelOptimizer
     {
         if (!config.Benchmark.Enabled) return;
 
-        var result = await _modelBenchmark.BenchmarkModelAsync(modelPath, config.Benchmark, ct);
+        var result = await _benchmark.BenchmarkModelAsync(modelPath, config.Benchmark, ct);
         // Store benchmark results
     }
 
@@ -448,7 +448,7 @@ public sealed class ModelOptimizer : IModelOptimizer
 
     private async Task<ModelSpec> LoadModelSpecAsync(string modelPath, CancellationToken ct)
     {
-        return await _modelConverter.GetModelSpecAsync(modelPath, ct) ?? new ModelSpec();
+        return await _converter.GetModelSpecAsync(modelPath, ct) ?? new ModelSpec();
     }
 
     private long GetModelSize(string modelPath)
@@ -508,33 +508,4 @@ public sealed class ModelOptimizer : IModelOptimizer
         };
     }
 
-    public async Task<OptimizationResult?> GetOptimizationResultAsync(string optimizationId, CancellationToken ct = default)
-    {
-        _runningOptimizations.TryGetValue(optimizationId, out var result);
-        return result;
-    }
-
-    public async Task<List<OptimizationResult>> GetOptimizationHistoryAsync(string modelId, int page = 1, int pageSize = 20, CancellationToken ct = default)
-    {
-        return new List<OptimizationResult>();
-    }
-
-    public async Task<bool> CancelOptimizationAsync(string optimizationId, CancellationToken ct = default)
-    {
-        if (_cancellationTokens.TryRemove(optimizationId, out var cts))
-        {
-            cts.Cancel();
-            return true;
-        }
-        return false;
-    }
-}
-
-public sealed class OptimizationOptions
-{
-    public int DefaultNodeTimeoutSeconds { get; set; } = 300;
-    public int MaxConcurrentOptimizations { get; set; } = 4;
-    public bool FailOnAccuracyDrop { get; set; } = true;
-    public double MaxAccuracyDropThreshold { get; set; } = 0.02; // 2%
-    public double MaxLatencyIncreaseThreshold { get; set; } = 1.1; // 10%
 }

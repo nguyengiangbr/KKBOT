@@ -16,37 +16,37 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.OrchestrationKKBOT.Orchestration.csproj" />
-    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.LoaderKKBOT.Plugins.Loader.csproj" />
-    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.OrchestrationKKBOT.Orchestration.csproj" />
-    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.LoaderKKBOT.Plugins.Loader.csproj" />
-    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.OrchestrationKKBOT.Orchestration.csproj" />
-    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Plugins.LoaderKKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="8.0.0" />
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" />
   </ItemGroup>
 
 </Project>

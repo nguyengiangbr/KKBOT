@@ -1,8 +1,6 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
-using KKBOT.Domain.Models.Perception;
-
 namespace KKBOT.Plugins.Abstractions;
 
 public interface IGameTaskDefinition

@@ -57,7 +57,7 @@ public sealed class DpapiSecretManager : ISecretManager
             var directory = Path.GetDirectoryName(keyPath);
             if (!Directory.Exists(directory))
             {
-                Directory.CreateDirectory(directory);
+                Directory.CreateDirectory(directory!);
             }
 
             await File.WriteAllBytesAsync(keyPath, encrypted, cancellationToken);
@@ -165,7 +165,7 @@ public sealed class DpapiSecretManager : ISecretManager
     public async Task<string> RotateAsync(string key, Func<string, Task<string>> generator, CancellationToken cancellationToken = default)
     {
         var currentSecret = await GetAsync(key, cancellationToken);
-        var newSecret = await generator(currentSecret);
+        var newSecret = await generator(currentSecret ?? string.Empty);
         await StoreAsync(key, newSecret, cancellationToken);
         return newSecret;
     }
@@ -205,58 +205,43 @@ public sealed class DpapiSecretManager : ISecretManager
 
     private byte[] EncryptAesGcm(byte[] plaintext)
     {
-        using var aes = Aes.Create();
-        aes.KeySize = 256;
-        aes.Mode = CipherMode.GCM;
-        aes.Key = _options.MasterKey ?? DeriveKey(_options.MasterPassword);
-        aes.GenerateIV();
+        var key = _options.MasterKey ?? DeriveKey(_options.MasterPassword);
+        using var aesGcm = new AesGcm(key, 16);
+        var nonce = new byte[AesGcm.NonceByteSizes.MaxSize];
+        RandomNumberGenerator.Fill(nonce);
+        var ciphertext = new byte[plaintext.Length];
+        var tag = new byte[16];
+        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
 
-        using var encryptor = aes.CreateEncryptor();
-        var ciphertext = new byte[plaintext.Length + 16]; // +16 for auth tag
-        
-        var ciphertextBytes = encryptor.TransformFinalBlock(plaintext, 0, plaintext.Length);
-        var authTag = aes.GetAuthenticationTag();
-
-        // Combine IV + Ciphertext + AuthTag
-        var result = new byte[aes.IV.Length + ciphertextBytes.Length + 16];
-        Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-        Buffer.BlockCopy(ciphertextBytes, 0, result, aes.IV.Length, ciphertextBytes.Length);
-        Buffer.BlockCopy(aes.GetAuthenticationTag(), 0, result, aes.IV.Length + ciphertextBytes.Length, 16);
-
+        var result = new byte[nonce.Length + ciphertext.Length + tag.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, result, nonce.Length + ciphertext.Length, tag.Length);
         return result;
     }
 
     private byte[] DecryptAesGcm(byte[] ciphertext)
     {
-        using var aes = Aes.Create();
-        aes.KeySize = 256;
-        aes.Mode = CipherMode.GCM;
-        aes.Key = _options.MasterKey ?? DeriveKey(_options.MasterPassword);
-        aes.GenerateIV();
-
-        // Extract IV (first 12 bytes for GCM)
-        var iv = new byte[12];
-        Buffer.BlockCopy(ciphertext, 0, iv, 0, 12);
-        aes.IV = iv;
-
-        // Extract auth tag (last 16 bytes)
-        var authTag = new byte[16];
-        Buffer.BlockCopy(ciphertext, ciphertext.Length - 16, authTag, 0, 16);
-        aes.SetAuthenticationTag(authTag);
-
-        // Extract ciphertext
-        var ciphertextLength = ciphertext.Length - 12 - 16;
-        var ciphertextBytes = new byte[ciphertextLength];
-        Buffer.BlockCopy(ciphertext, 12, ciphertextBytes, 0, ciphertextLength);
-
-        using var decryptor = aes.CreateDecryptor();
-        var plaintext = decryptor.TransformFinalBlock(ciphertextBytes, 0, ciphertextBytes.Length);
+        var key = _options.MasterKey ?? DeriveKey(_options.MasterPassword);
+        using var aesGcm = new AesGcm(key, 16);
+        var nonceSize = AesGcm.NonceByteSizes.MaxSize;
+        var nonce = new byte[nonceSize];
+        Buffer.BlockCopy(ciphertext, 0, nonce, 0, nonceSize);
+        var tag = new byte[16];
+        Buffer.BlockCopy(ciphertext, ciphertext.Length - 16, tag, 0, 16);
+        var cipherBytesLength = ciphertext.Length - nonceSize - 16;
+        var cipherBytes = new byte[cipherBytesLength];
+        Buffer.BlockCopy(ciphertext, nonceSize, cipherBytes, 0, cipherBytesLength);
+        var plaintext = new byte[cipherBytesLength];
+        aesGcm.Decrypt(nonce, cipherBytes, tag, plaintext);
         return plaintext;
     }
 
     private byte[] DeriveKey(string password)
     {
+#pragma warning disable SYSLIB0060
         using var pbkdf2 = new Rfc2898DeriveBytes(password, _options.KeyDerivationSalt, 100000, HashAlgorithmName.SHA256);
+#pragma warning restore SYSLIB0060
         return pbkdf2.GetBytes(32); // 256-bit key
     }
 

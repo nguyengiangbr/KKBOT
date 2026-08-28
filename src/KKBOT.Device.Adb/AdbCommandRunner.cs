@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
+using Polly.Wrap;
 using KKBOT.Observability;
 using KKBOT.Observability.Metrics;
 
@@ -59,45 +60,12 @@ public record AdbCommandResult
 {
     public int ExitCode { get; init; }
     public string Output { get; init; } = string.Empty;
-    public string ErrorOutput { get; init; } = string.Empty
+    public string ErrorOutput { get; init; } = string.Empty;
     public TimeSpan Duration { get; init; }
     public bool IsSuccess => ExitCode == 0;
     public AdbErrorType ErrorType { get; init; } = AdbErrorType.None;
     public string? ErrorCode { get; init; }
     public string CorrelationId { get; init; } = string.Empty;
-}
-
-/// <summary>
-/// Configuration options for ADB command runner.
-/// </summary>
-public record AdbClientOptions
-{
-    public string AdbPath { get; init; } = "adb";
-    public int MaxRetries { get; init; } = 3;
-    public int RetryDelayMs { get; init; } = 500;
-    public TimeSpan CommandTimeout { get; init; } = TimeSpan.FromSeconds(30);
-    public TimeSpan ConnectionTimeout { get; init; } = TimeSpan.FromSeconds(10);
-    
-    // Circuit breaker settings
-    public int CircuitBreakerThreshold { get; init; } = 5;
-    public TimeSpan CircuitBreakerDuration { get; init; } = TimeSpan.FromSeconds(30);
-    
-    // Command-type specific timeouts (milliseconds)
-    public Dictionary<AdbCommandType, int> CommandTimeoutsMs { get; init; } = new()
-    {
-        [AdbCommandType.DeviceList] = 5000,
-        [AdbCommandType.DeviceState] = 5000,
-        [AdbCommandType.Screencap] = 10000,
-        [AdbCommandType.Shell] = 30000,
-        [AdbCommandType.Input] = 5000,
-        [AdbCommandType.Install] = 120000,
-        [AdbCommandType.Uninstall] = 30000,
-        [AdbCommandType.Forward] = 5000,
-        [AdbCommandType.Reverse] = 5000,
-        [AdbCommandType.Logcat] = 10000,
-        [AdbCommandType.Push] = 60000,
-        [AdbCommandType.Pull] = 60000
-    };
 }
 
 /// <summary>
@@ -170,7 +138,7 @@ public sealed class AdbCommandRunner : IAsyncDisposable
                 durationOfBreak: _options.CircuitBreakerDuration,
                 onBreak: (outcome, duration) =>
                 {
-                    _circuitBreakerTrips.Add(1, new KeyValuePair<string, object>("reason", outcome.Exception?.GetType().Name ?? outcome.Result.ErrorType.ToString()));
+                    _circuitBreakerTrips.Add(1, new KeyValuePair<string, object?>("reason", outcome.Exception?.GetType().Name ?? outcome.Result.ErrorType.ToString()));
                     _logger.LogError("ADB circuit breaker OPENED for {Duration}s due to: {Reason}", 
                         duration.TotalSeconds, outcome.Exception?.Message ?? outcome.Result.ErrorType.ToString());
                     _metricsRegistry?.IncrementHttpRequestsFailed(); // Reuse metric for circuit breaker trips
@@ -202,7 +170,7 @@ public sealed class AdbCommandRunner : IAsyncDisposable
 
         // Record metrics
         _activeCommands.Add(1);
-        _commandsTotal.Add(1, new KeyValuePair<string, object>("type", commandType.ToString()));
+        _commandsTotal.Add(1, new KeyValuePair<string, object?>("type", commandType.ToString()));
         _metricsRegistry?.IncrementHttpRequests(); // Reuse HTTP metric
 
         var context = new Context
@@ -220,14 +188,14 @@ public sealed class AdbCommandRunner : IAsyncDisposable
 
             // Record success metrics
             _commandDurationMs.Record(result.Duration.TotalMilliseconds, 
-                new KeyValuePair<string, object>("type", commandType.ToString()),
-                new KeyValuePair<string, object>("success", "true"));
+                new KeyValuePair<string, object?>("type", commandType.ToString()),
+                new KeyValuePair<string, object?>("success", "true"));
             
             if (!result.IsSuccess)
             {
                 _commandsFailed.Add(1, 
-                    new KeyValuePair<string, object>("type", commandType.ToString()),
-                    new KeyValuePair<string, object>("error_type", result.ErrorType.ToString()));
+                    new KeyValuePair<string, object?>("type", commandType.ToString()),
+                    new KeyValuePair<string, object?>("error_type", result.ErrorType.ToString()));
             }
 
             return result;
@@ -235,22 +203,22 @@ public sealed class AdbCommandRunner : IAsyncDisposable
         catch (BrokenCircuitException)
         {
             _commandDurationMs.Record(0, 
-                new KeyValuePair<string, object>("type", commandType.ToString()),
-                new KeyValuePair<string, object>("success", "false"),
-                new KeyValuePair<string, object>("circuit_open", "true"));
+                new KeyValuePair<string, object?>("type", commandType.ToString()),
+                new KeyValuePair<string, object?>("success", "false"),
+                new KeyValuePair<string, object?>("circuit_open", "true"));
             _commandsFailed.Add(1, 
-                new KeyValuePair<string, object>("type", commandType.ToString()),
-                new KeyValuePair<string, object>("error_type", "circuit_open"));
+                new KeyValuePair<string, object?>("type", commandType.ToString()),
+                new KeyValuePair<string, object?>("error_type", "circuit_open"));
             throw;
         }
         catch (Exception ex)
         {
             _commandDurationMs.Record(0,
-                new KeyValuePair<string, object>("type", commandType.ToString()),
-                new KeyValuePair<string, object>("success", "false"));
+                new KeyValuePair<string, object?>("type", commandType.ToString()),
+                new KeyValuePair<string, object?>("success", "false"));
             _commandsFailed.Add(1,
-                new KeyValuePair<string, object>("type", commandType.ToString()),
-                new KeyValuePair<string, object>("error_type", ex.GetType().Name));
+                new KeyValuePair<string, object?>("type", commandType.ToString()),
+                new KeyValuePair<string, object?>("error_type", ex.GetType().Name));
             throw;
         }
         finally
@@ -343,8 +311,7 @@ public sealed class AdbCommandRunner : IAsyncDisposable
 
             if (!result.IsSuccess)
             {
-                _logger.LogWarning("[{CorrelationId}] ADB command failed (exit code {ExitCode}, type: {ErrorType}): {Arguments}
-Error: {ErrorOutput}",
+                _logger.LogWarning("[{CorrelationId}] ADB command failed (exit code {ExitCode}, type: {ErrorType}): {Arguments} Error: {ErrorOutput}",
                     correlationId, result.ExitCode, errorType, arguments, result.ErrorOutput);
             }
             else
@@ -387,7 +354,7 @@ Error: {ErrorOutput}",
         var effectiveTimeout = timeout ?? GetCommandTimeout(commandType);
 
         _activeCommands.Add(1);
-        _commandsTotal.Add(1, new KeyValuePair<string, object>("type", commandType.ToString()));
+        _commandsTotal.Add(1, new KeyValuePair<string, object?>("type", commandType.ToString()));
 
         try
         {
@@ -431,14 +398,14 @@ Error: {ErrorOutput}",
             var duration = DateTime.UtcNow - startTime;
 
             _commandDurationMs.Record(duration.TotalMilliseconds,
-                new KeyValuePair<string, object>("type", commandType.ToString()),
-                new KeyValuePair<string, object>("success", process.ExitCode == 0 ? "true" : "false"));
+                new KeyValuePair<string, object?>("type", commandType.ToString()),
+                new KeyValuePair<string, object?>("success", process.ExitCode == 0 ? "true" : "false"));
 
             if (process.ExitCode != 0)
             {
                 _commandsFailed.Add(1,
-                    new KeyValuePair<string, object>("type", commandType.ToString()),
-                    new KeyValuePair<string, object>("error_type", "binary_failed"));
+                    new KeyValuePair<string, object?>("type", commandType.ToString()),
+                    new KeyValuePair<string, object?>("error_type", "binary_failed"));
                 throw new InvalidOperationException($"ADB binary command failed: {errorOutput}");
             }
 
@@ -571,11 +538,11 @@ Error: {ErrorOutput}",
 
     private static bool IsTransientException(Exception ex)
     {
-        return ex is TimeoutException or 
-               IOException or 
-               UnauthorizedAccessException or
-               (ex is InvalidOperationException ioe && 
-                (ioe.Message.Contains("timed out") || ioe.Message.Contains("connection")));
+        return ex is TimeoutException or
+               IOException or
+               UnauthorizedAccessException
+               || (ex is InvalidOperationException ioe &&
+                   (ioe.Message.Contains("timed out") || ioe.Message.Contains("connection")));
     }
 
     private static bool IsCircuitBreakerException(Exception ex)

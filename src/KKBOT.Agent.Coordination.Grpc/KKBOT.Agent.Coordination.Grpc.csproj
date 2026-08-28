@@ -10,17 +10,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..KKBOT.Agent.Coordination.AbstractionsKKBOT.Agent.Coordination.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Agent.CoordinationKKBOT.Agent.Coordination.csproj" />
-    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Agent.Coordination.Abstractions\KKBOT.Agent.Coordination.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Agent.Coordination\KKBOT.Agent.Coordination.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.AspNetCore" Version="2.57.0" />
-    <PackageReference Include="Google.Protobuf" Version="3.21.12" />
-    <PackageReference Include="Grpc.Tools" Version="2.57.0" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 
   <ItemGroup>

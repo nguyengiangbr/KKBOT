@@ -27,7 +27,7 @@ public sealed class Saga : ISaga
     public DateTime? CompletedAt { get; private set; }
     public string? ErrorMessage => _errorMessage;
 
-    private Saga(Guid sagaId, string sagaType, IEnumerable<SagaStep> steps)
+    internal Saga(Guid sagaId, string sagaType, IEnumerable<SagaStep> steps)
     {
         SagaId = sagaId;
         SagaType = sagaType;

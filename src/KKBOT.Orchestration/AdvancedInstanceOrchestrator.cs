@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using KKBOT.Domain.Models;
 using KKBOT.Orchestration.DynamicDag;
 using KKBOT.Orchestration.EventSourcing;
+using KKBOT.Orchestration.MultiTenancy;
 using KKBOT.Orchestration.Saga;
 using KKBOT.Plugins.Abstractions;
 using KKBOT.Plugins.Loader;
@@ -52,15 +53,15 @@ public sealed class AdvancedInstanceOrchestrator
         CancellationToken cancellationToken)
     {
         // 1. Resolve tenant
-        var tenant = await _tenantProvider.GetTenantAsync(instance.TenantId ?? "default", cancellationToken);
+        var tenant = await _tenantProvider.GetTenantAsync(instance.Key ?? "default", cancellationToken);
         if (tenant == null)
         {
-            _logger.LogWarning("Tenant {TenantId} not found, using default", instance.TenantId);
+            _logger.LogWarning("Tenant {TenantId} not found, using default", instance.Key);
         }
 
         // 2. Load plugin
-        var modules = await _pluginLoader.LoadPluginsAsync(pluginsPath, cancellationToken);
-        var module = modules.FirstOrDefault(m => m.Id.Equals(instance.Module?.Id, StringComparison.OrdinalIgnoreCase));
+        var modules = await _pluginLoader.LoadAllPluginsAsync(cancellationToken);
+        var module = modules.FirstOrDefault(m => string.Equals(m.Id?.ToString(), instance.Module?.Id.ToString(), StringComparison.OrdinalIgnoreCase));
         if (module == null)
         {
             return InstanceRunResult.Failed($"Plugin {instance.Module?.Id} not found");
@@ -68,7 +69,7 @@ public sealed class AdvancedInstanceOrchestrator
 
         // 3. Validate module
         var validation = await module.ValidateAsync(
-            new ModuleContext(instance.Id, instance.DeviceId ?? Guid.Empty, module.Id),
+            new ModuleContext(instance.Id, instance.DeviceId ?? Guid.Empty, Guid.Parse(module.Id)),
             cancellationToken);
         if (!validation.IsValid)
         {
@@ -79,7 +80,7 @@ public sealed class AdvancedInstanceOrchestrator
         var dagContext = new DagBuildContext(
             instance.Id,
             instance.DeviceId ?? Guid.Empty,
-            instance.Configuration ?? "{}",
+            instance.ConfigOverride ?? "{}",
             new Dictionary<string, object>(),
             cancellationToken);
 
@@ -91,7 +92,7 @@ public sealed class AdvancedInstanceOrchestrator
         await _eventStore.AppendAsync(new InstanceStartedEvent
         {
             AggregateId = instance.Id,
-            InstanceName = instance.Name,
+            InstanceName = instance.DisplayName,
             ModuleId = module.Id,
             DagId = dag.DagId,
             Version = 1
@@ -113,12 +114,12 @@ public sealed class AdvancedInstanceOrchestrator
     }
 
     private async Task<InstanceRunResult> ExecuteDagAsync(
-        DynamicDag dag,
+        KKBOT.Orchestration.DynamicDag.DynamicDag dag,
         Instance instance,
         IGameModule module,
         CancellationToken ct)
     {
-        var nodeResults = new Dictionary<string, object>();
+        var nodeResults = new Dictionary<string, object?>();
         var executedNodes = new HashSet<string>();
 
         try
@@ -158,7 +159,7 @@ public sealed class AdvancedInstanceOrchestrator
                 }, ct);
             }
 
-            return InstanceRunResult.Success();
+            return InstanceRunResult.Succeeded();
         }
         catch (Exception ex)
         {
@@ -171,8 +172,8 @@ public sealed class AdvancedInstanceOrchestrator
         DagNode node,
         Instance instance,
         IGameModule module,
-        DynamicDag dag,
-        Dictionary<string, object> nodeResults,
+        KKBOT.Orchestration.DynamicDag.DynamicDag dag,
+        Dictionary<string, object?> nodeResults,
         CancellationToken ct)
     {
         _logger.LogDebug("Executing node {NodeId} ({NodeType})", node.NodeId, node.NodeType);
@@ -237,7 +238,10 @@ public sealed class AdvancedInstanceOrchestrator
 
         _logger.LogDebug("Executing task {TaskId} ({TaskName})", task.Id, task.Name);
 
-        var taskContext = new TaskContext(instance.Id, Guid.NewGuid(), node.Config ?? new());
+        var parameters = node.Config != null
+            ? node.Config.ToDictionary(kv => kv.Key, kv => (object?)kv.Value)
+            : new Dictionary<string, object?>();
+        var taskContext = new TaskContext(instance.Id, Guid.NewGuid(), parameters);
         var nextState = await task.ExecuteAsync(taskContext, ct);
 
         return new { TaskId = task.Id, Completed = true, NextStateId = nextState.Id };
@@ -247,8 +251,8 @@ public sealed class AdvancedInstanceOrchestrator
         DagNode node,
         Instance instance,
         IGameModule module,
-        DynamicDag dag,
-        Dictionary<string, object> nodeResults,
+        KKBOT.Orchestration.DynamicDag.DynamicDag dag,
+        Dictionary<string, object?> nodeResults,
         CancellationToken ct)
     {
         // Evaluate condition expression
@@ -268,25 +272,25 @@ public sealed class AdvancedInstanceOrchestrator
 // Result types
 public sealed record InstanceRunResult(bool Success, string? ErrorMessage = null, object? Data = null)
 {
-    public static InstanceRunResult Success(object? data = null) => new(true, null, data);
+    public static InstanceRunResult Succeeded(object? data = null) => new(true, null, data);
     public static InstanceRunResult Failed(string error) => new(false, error);
 }
 
 // Events
-public sealed record InstanceStartedEvent : EventBase
+public sealed record InstanceStartedEvent : EventBase, IOrchestrationEvent
 {
     public string InstanceName { get; init; } = string.Empty;
     public string ModuleId { get; init; } = string.Empty;
     public Guid DagId { get; init; }
 }
 
-public sealed record InstanceCompletedEvent : EventBase
+public sealed record InstanceCompletedEvent : EventBase, IOrchestrationEvent
 {
     public bool Success { get; init; }
     public string? ErrorMessage { get; init; }
 }
 
-public sealed record NodeExecutedEvent : EventBase
+public sealed record NodeExecutedEvent : EventBase, IOrchestrationEvent
 {
     public string NodeId { get; init; } = string.Empty;
     public string NodeType { get; init; } = string.Empty;

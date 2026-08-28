@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Tesseract" Version="5.0.0" />
-    <PackageReference Include="Tesseract.Data" Version="4.1.1" />
+    <PackageReference Include="Tesseract" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 </Project>

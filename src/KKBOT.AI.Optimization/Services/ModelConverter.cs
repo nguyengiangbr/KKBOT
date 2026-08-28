@@ -97,7 +97,7 @@ public sealed class ModelConverter : IModelConverter
         }
         catch (Exception ex)
         {
-            // Fallback: try to parse from file
+            _logger.LogWarning(ex, "Failed to load ONNX spec, falling back to defaults");
         }
     }
 

@@ -14,14 +14,14 @@ public sealed class AdbInputDispatcher : IAsyncDisposable
 {
     private readonly string _deviceId;
     private readonly AdbClientOptions _options;
-    private readonly ILogger<AdbInputDispatcher> _logger;
+    private readonly ILogger _logger;
     private readonly AdbCommandRunner _commandRunner;
     private bool _disposed;
 
     public AdbInputDispatcher(
         string deviceId,
         AdbClientOptions options,
-        ILogger<AdbInputDispatcher> logger,
+        ILogger logger,
         AdbCommandRunner commandRunner)
     {
         _deviceId = deviceId;

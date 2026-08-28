@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using KKBOT.AI.Abstractions;
 
 namespace KKBOT.AI.Ollama.Models;
 
@@ -25,5 +26,5 @@ public sealed class OllamaResponse
     [JsonPropertyName("load_duration")]
     public long LoadDuration { get; set; }
 
-    public AiUsage Usage => new() { Tokens = EvalCount + PromptEvalCount, DurationMs = (int)TotalDuration };
+    public AiUsage Usage => new(EvalCount + PromptEvalCount, (int)TotalDuration);
 }

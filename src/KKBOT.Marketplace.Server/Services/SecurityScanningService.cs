@@ -215,7 +215,8 @@ public sealed class SecurityScanningService : ISecurityScanningService
         // Debug code
         new SecurityRule("SEC009", "Debug Code in Production", "Detects debug/test code that should not be in production",
             Severity.Medium, "static", "A09:2021", "CWE-489",
-            new[] { "Debug.WriteLine", "Console.WriteLine", "Trace.WriteLine", "#if DEBUG", "Debugger.Break" }),
+            new[] { "Debug.WriteLine", "Console.WriteLine", "Trace.WriteLine", "#if DEBUG", "Debugger.Break" },
+            Array.Empty<string>()),
 
         // Unsafe reflection
         new SecurityRule("SEC010", "Unsafe Reflection", "Detects potentially unsafe reflection usage",
@@ -286,12 +287,6 @@ public sealed class SecurityScanningService : ISecurityScanningService
             new[] { "File.Create", "Directory.CreateDirectory", "File.SetAttributes" },
             new[] { "FileAttributes.Normal", "FileShare.ReadWrite" })
     };
-
-    private readonly MarketplaceDbContext _dbContext;
-    private readonly IStorageService _storage;
-    private readonly ILogger<SecurityScanningService> _logger;
-    private readonly SecurityScanOptions _options;
-    private readonly HttpClient _httpClient;
 
     public SecurityScanningService(
         MarketplaceDbContext dbContext,
@@ -413,18 +408,42 @@ public sealed class SecurityScanningService : ISecurityScanningService
 
     public async Task<SecurityScanResult> GetLatestScanAsync(string pluginId, string version, CancellationToken ct = default)
     {
-        return await _dbContext.SecurityScans
+        var latest = await _dbContext.SecurityScans
             .Where(s => s.PluginId == pluginId && s.Version == version)
             .OrderByDescending(s => s.ScannedAt)
-            .FirstOrDefaultAsync(ct) ?? new SecurityScanResult();
+            .FirstOrDefaultAsync(ct);
+
+        return latest == null ? new SecurityScanResult() : ToScanResult(latest);
     }
 
     public async Task<List<SecurityScanResult>> GetScanHistoryAsync(string pluginId, string version, CancellationToken ct = default)
     {
-        return await _dbContext.SecurityScans
+        var scans = await _dbContext.SecurityScans
             .Where(s => s.PluginId == pluginId && s.Version == version)
             .OrderByDescending(s => s.ScannedAt)
             .ToListAsync(ct);
+
+        return scans.Select(ToScanResult).ToList();
+    }
+
+    private static SecurityScanResult ToScanResult(SecurityScan scan)
+    {
+        return new SecurityScanResult
+        {
+            ScanId = scan.Id.ToString(),
+            PluginId = scan.PluginId,
+            Version = scan.Version,
+            ScannedAt = scan.ScannedAt,
+            Status = scan.Status,
+            RiskLevel = scan.RiskLevel,
+            Findings = JsonSerializer.Deserialize<List<SecurityFinding>>(scan.FindingsJson) ?? new(),
+            PermissionAnalysis = JsonSerializer.Deserialize<List<PermissionAnalysis>>(scan.PermissionsJson) ?? new(),
+            DependencyVulnerabilities = JsonSerializer.Deserialize<List<DependencyVulnerability>>(scan.DependencyVulnerabilitiesJson) ?? new(),
+            CodeQuality = JsonSerializer.Deserialize<CodeQualityMetrics>(scan.CodeQualityJson) ?? new(),
+            Behavior = JsonSerializer.Deserialize<BehaviorAnalysis>(scan.BehaviorJson) ?? new(),
+            ScanDurationMs = scan.ScanDurationMs,
+            ScannerVersion = scan.ScannerVersion
+        };
     }
 
     public async Task<bool> IsPluginSafeAsync(string pluginId, string version, CancellationToken ct = default)
@@ -497,7 +516,7 @@ public sealed class SecurityScanningService : ISecurityScanningService
             // Check context patterns
             if (rule.ContextPatterns.Any())
             {
-                var context = GetInstructionContext(instruction, index, 5);
+                var context = GetInstructionContext(instruction, method, index, 5);
                 if (!rule.ContextPatterns.Any(p => context.Contains(p, StringComparison.OrdinalIgnoreCase)))
                     continue;
             }
@@ -505,7 +524,7 @@ public sealed class SecurityScanningService : ISecurityScanningService
             // Check for negative patterns (absence checks)
             if (rule.IsNegativeCheck && rule.NegativeKeywords != null)
             {
-                var methodBody = method.Body.GetILAsString();
+                var methodBody = GetIlAsString(method);
                 if (rule.NegativeKeywords.Any(k => methodBody.Contains(k, StringComparison.OrdinalIgnoreCase)))
                     continue; // Found the required pattern, so not a violation
             }
@@ -519,8 +538,8 @@ public sealed class SecurityScanningService : ISecurityScanningService
                 Category = rule.Category,
                 FilePath = $"{type.FullName}::{method.Name}",
                 LineNumber = instruction.Offset,
-                CodeSnippet = GetCodeSnippet(instruction),
-                Recommendation = GetRecommendation(rule.Id),
+                CodeSnippet = GetCodeSnippet(instruction, method),
+                Recommendation = GetRecommendation(rule),
                 CweId = rule.CweId,
                 OwaspCategory = rule.OwaspCategory,
                 Metadata = new Dictionary<string, string>
@@ -539,13 +558,14 @@ public sealed class SecurityScanningService : ISecurityScanningService
     private void CheckMethodBody(List<SecurityFinding> findings, TypeDefinition type, MethodDefinition method)
     {
         // Check for hardcoded secrets in method body
-        var bodyText = method.Body.GetILAsString();
-        
+        var bodyText = GetIlAsString(method);
+
         // Check for hardcoded strings that look like secrets
         var stringLiterals = method.Body.Instructions
-            .Where(i => i.OpCode == OpCode.Ldstr)
+            .Where(i => i.OpCode == OpCodes.Ldstr)
             .Select(i => i.Operand as string)
             .Where(s => !string.IsNullOrEmpty(s))
+            .Select(s => s!)
             .ToList();
 
         foreach (var literal in stringLiterals)
@@ -645,10 +665,9 @@ public sealed class SecurityScanningService : ISecurityScanningService
                opcode.Contains(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
-    private string GetInstructionContext(Instruction instruction, int index, int window)
+    private string GetInstructionContext(Instruction instruction, MethodDefinition method, int index, int window)
     {
-        var method = instruction.GetMethod();
-        if (method == null || !method.HasBody) return "";
+        if (!method.HasBody) return "";
 
         var instructions = method.Body.Instructions;
         var start = Math.Max(0, index - window);
@@ -662,10 +681,9 @@ public sealed class SecurityScanningService : ISecurityScanningService
         return context.ToString();
     }
 
-    private string GetCodeSnippet(Instruction instruction)
+    private string GetCodeSnippet(Instruction instruction, MethodDefinition method)
     {
-        var method = instruction.GetMethod();
-        if (method == null || !method.HasBody) return instruction.ToString();
+        if (!method.HasBody) return instruction.ToString();
 
         var instructions = method.Body.Instructions;
         var index = instructions.IndexOf(instruction);
@@ -679,6 +697,20 @@ public sealed class SecurityScanningService : ISecurityScanningService
             snippet.AppendLine($"{prefix}{instructions[i].Offset:X4}: {instructions[i]}");
         }
         return snippet.ToString();
+    }
+
+    private static string GetIlAsString(MethodDefinition method)
+    {
+        if (!method.HasBody) return string.Empty;
+        var sb = new StringBuilder();
+        foreach (var instr in method.Body.Instructions)
+            sb.AppendLine(instr.ToString());
+        return sb.ToString();
+    }
+
+    private static string GetRecommendation(SecurityRule rule)
+    {
+        return $"Review the use of '{rule.Title}' and ensure it complies with security best practices ({rule.CweId}).";
     }
 
     private void ScanEmbeddedResources(List<SecurityFinding> findings, AssemblyDefinition assembly)
@@ -721,8 +753,9 @@ public sealed class SecurityScanningService : ISecurityScanningService
         foreach (var (pattern, type_) in sensitivePatterns)
         {
             var matches = System.Text.RegularExpressions.Regex.Matches(content, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            foreach (Match match in matches)
+            foreach (Match? match in matches)
             {
+                var value = match!.Value;
                 findings.Add(new SecurityFinding
                 {
                     RuleId = "SEC_CONFIG_SECRET",
@@ -731,7 +764,7 @@ public sealed class SecurityScanningService : ISecurityScanningService
                     Severity = Severity.Critical,
                     Category = "static",
                     FilePath = resourceName,
-                    CodeSnippet = match.Value.Length > 100 ? match.Value.Substring(0, 100) + "..." : match.Value,
+                    CodeSnippet = value.Length > 100 ? value.Substring(0, 100) + "..." : value,
                     Recommendation = "Move secrets to secure configuration or secret manager",
                     CweId = "CWE-798",
                     OwaspCategory = "A07:2021"
@@ -781,10 +814,10 @@ public sealed class SecurityScanningService : ISecurityScanningService
                     {
                         foreach (var vuln in result.Vulns ?? new List<OsvVuln>())
                         {
-                            var dep = dependencies.FirstOrDefault(d => d.Name.Equals(result.Package.Name, StringComparison.OrdinalIgnoreCase));
+                            var dep = dependencies.FirstOrDefault(d => d.Name.Equals(result.Package!.Name, StringComparison.OrdinalIgnoreCase));
                             vulnerabilities.Add(new DependencyVulnerability
                             {
-                                DependencyName = result.Package.Name,
+                                DependencyName = result.Package!.Name,
                                 Version = dep?.Version ?? "unknown",
                                 VulnerabilityId = vuln.Id,
                                 Title = vuln.Summary ?? vuln.Details ?? "Vulnerability found",

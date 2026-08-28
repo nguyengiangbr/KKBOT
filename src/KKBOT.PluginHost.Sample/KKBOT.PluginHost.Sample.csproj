@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.PluginHost.Sample</AssemblyName>
+    <RootNamespace>KKBOT.PluginHost.Sample</RootNamespace>
+    <NoWarn>$(NoWarn);SA1633;SA1028;SA1518;SA1402;SA1611;SA1615</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.PluginHost.Core\KKBOT.PluginHost.Core.csproj" />
+    <ProjectReference Include="..\KKBOT.PluginHost.Wpf\KKBOT.PluginHost.Wpf.csproj" />
+    <ProjectReference Include="..\KKBOT.PluginHost.Navigation\KKBOT.PluginHost.Navigation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <Target Name="CopyToHostPlugins" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)"
+          DestinationFolder="$(MSBuildProjectDirectory)\..\KKBOT.PluginHost.ControlCenter\bin\$(Configuration)\net10.0-windows10.0.19041.0\plugins"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

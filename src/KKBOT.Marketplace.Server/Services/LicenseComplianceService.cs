@@ -83,7 +83,8 @@ public enum ConflictType
     MissingSourceDistribution,
     PatentGrantConflict,
     LicenseChange,
-    DualLicensingConflict
+    DualLicensingConflict,
+    ConditionallyCompatible
 }
 
 public sealed class LicenseCompatibilityMatrix
@@ -279,23 +280,6 @@ public sealed class PolicyRule
     public string Action { get; set; } = string.Empty; // deny, warn, require_approval
 }
 
-public sealed class LicensePolicyViolation
-{
-    public string RuleId { get; set; } = string.Empty;
-    public string RuleName { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public ViolationSeverity Severity { get; set; } = ViolationSeverity.High;
-    public string Remediation { get; set; } = string.Empty;
-}
-
-public enum ViolationSeverity
-{
-    Low,
-    Medium,
-    High,
-    Critical
-}
-
 public sealed class LicenseComplianceService : ILicenseComplianceService
 {
     private readonly MarketplaceDbContext _dbContext;
@@ -348,7 +332,7 @@ public sealed class LicenseComplianceService : ILicenseComplianceService
         AnalyzeLicenseProperties(report);
 
         // 7. Check policy violations
-        report.PolicyViolations = await CheckPolicyViolationsAsync(report, ct);
+        report.PolicyViolations = CheckPolicyViolationsAsync(report, ct);
 
         // 8. Calculate compliance score
         report.ComplianceScore = CalculateComplianceScore(report);
@@ -400,13 +384,12 @@ public sealed class LicenseComplianceService : ILicenseComplianceService
         if (license == null)
             throw new InvalidOperationException($"License {licenseId} not found");
 
-        return license.Obligations;
-    }
-
-    public async Task<List<LicenseConflict>> DetectConflictsAsync(string pluginId, string version, CancellationToken ct = default)
-    {
-        var report = await CheckComplianceAsync(pluginId, version, ct);
-        return report.Conflicts;
+        return new LicenseObligations
+        {
+            LicenseId = license.SpdxId,
+            LicenseName = license.Name,
+            Obligations = license.Obligations
+        };
     }
 
     public async Task<bool> IsLicenseCompatibleAsync(string license1, string license2, CancellationToken ct = default)
@@ -729,7 +712,7 @@ public sealed class LicenseComplianceService : ILicenseComplianceService
 
     private void AnalyzeLicenseProperties(LicenseComplianceReport report)
     {
-        var allLicenses = report.DetectedLicenses.Select(d => _knowledgeBase.GetLicense(d.SpdxId)).Where(l => l != null).ToList();
+        var allLicenses = report.DetectedLicenses.Select(d => _knowledgeBase.GetLicense(d.SpdxId)).Where(l => l != null).Select(l => l!).ToList();
 
         report.HasCopyleft = allLicenses.Any(l => l.IsCopyleft);
         report.HasPatentGrant = allLicenses.Any(l => l.HasPatentGrant);
@@ -743,16 +726,16 @@ public sealed class LicenseComplianceService : ILicenseComplianceService
     {
         var obligations = new List<LicenseObligation>();
 
-        foreach (var detected in detected)
+        foreach (var det in detected)
         {
-            var license = _knowledgeBase.GetLicense(detected.SpdxId);
+            var license = _knowledgeBase.GetLicense(det.SpdxId);
             if (license?.Obligations != null)
             {
                 foreach (var obl in license.Obligations)
                 {
                     obligations.Add(new LicenseObligation
                     {
-                        Id = $"{detected.SpdxId}-{obl.Id}",
+                        Id = $"{det.SpdxId}-{obl.Id}",
                         Description = obl.Description,
                         Type = obl.Type,
                         IsMandatory = obl.IsMandatory,
@@ -765,7 +748,7 @@ public sealed class LicenseComplianceService : ILicenseComplianceService
         return obligations.DistinctBy(o => o.Id).ToList();
     }
 
-    private async Task<List<LicenseConflict>> DetectConflictsAsync(string pluginId, string version, CancellationToken ct)
+    public async Task<List<LicenseConflict>> DetectConflictsAsync(string pluginId, string version, CancellationToken ct)
     {
         var conflicts = new List<LicenseConflict>();
         var report = await CheckComplianceAsync(pluginId, version, ct);
@@ -1218,6 +1201,7 @@ public sealed class LicenseComplianceService : ILicenseComplianceService
         public bool RequiresLicenseNotice { get; set; }
         public bool RequiresCopyrightNotice { get; set; }
         public bool RequiresStateChanges { get; set; }
+        public bool IsDeprecated { get; set; }
         public List<string> CompatibleLicenses { get; set; } = new();
         public List<string> IncompatibleLicenses { get; set; } = new();
         public List<LicenseObligation> Obligations { get; set; } = new();

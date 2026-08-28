@@ -201,8 +201,8 @@ public sealed class LocalExperimentTracker : IExperimentTracker
 
         var allMetrics = experiments
             .Where(e => e.Status == ExperimentStatus.Completed)
-            .SelectMany(e => e.Results.ModelMetrics)
-            .ToDictionary(kvp => $"{e.Name}_{kvp.Key}", kvp => kvp.Value);
+            .SelectMany(e => e.Results.ModelMetrics.Select(kvp => new { e.Name, kvp.Key, kvp.Value }))
+            .ToDictionary(x => $"{x.Name}_{x.Key}", x => x.Value);
 
         var best = allMetrics.OrderByDescending(kvp => kvp.Value.Accuracy).FirstOrDefault();
 

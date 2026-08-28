@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using KKBOT.Domain.Enums;
+using Microsoft.Extensions.DependencyInjection;
 using KKBOT.Orchestration;
 using Microsoft.Extensions.Logging;
 
@@ -163,7 +165,7 @@ public sealed class JobExecutionProjection : IEventProjection
                     completeJob.Status = completed.Success ? JobStatus.Completed : JobStatus.Failed;
                     completeJob.CompletedAt = @event.Timestamp;
                     completeJob.Success = completed.Success;
-                    completeJob.DurationMs = (completeJob.CompletedAt - completeJob.StartedAt).TotalMilliseconds;
+                    completeJob.DurationMs = (completeJob.CompletedAt - completeJob.StartedAt)?.TotalMilliseconds ?? 0;
                 }
                 break;
         }
@@ -188,7 +190,9 @@ public sealed class JobExecutionProjection : IEventProjection
             RunningJobs = jobs.Count(j => j.Status == JobStatus.Running),
             CompletedJobs = jobs.Count(j => j.Status == JobStatus.Completed),
             FailedJobs = jobs.Count(j => j.Status == JobStatus.Failed),
-            AvgDurationMs = jobs.Where(j => j.DurationMs > 0).DefaultIfEmpty(0).Average(j => j.DurationMs),
+            AvgDurationMs = jobs.Count(j => j.DurationMs > 0) > 0
+                ? jobs.Where(j => j.DurationMs > 0).Average(j => j.DurationMs)
+                : 0,
             SuccessRate = jobs.Count > 0 ? (double)jobs.Count(j => j.Success) / jobs.Count : 0
         };
     }

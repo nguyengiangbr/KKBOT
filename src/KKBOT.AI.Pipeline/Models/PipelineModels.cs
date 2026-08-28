@@ -82,19 +82,20 @@ public sealed record ModelMetrics(
     string DatasetVersion
 );
 
-public sealed record TrainingJob(
-    string JobId,
-    string ModelId,
-    string Name,
-    TrainingConfig Config,
-    TrainingStatus Status,
-    TrainingProgress Progress,
-    string? ErrorMessage,
-    DateTime StartedAt,
-    DateTime? CompletedAt,
-    string? CheckpointPath,
-    Dictionary<string, object> Artifacts
-);
+public sealed record TrainingJob
+{
+    public string JobId { get; init; } = string.Empty;
+    public string ModelId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public TrainingConfig Config { get; init; } = default!;
+    public TrainingStatus Status { get; set; }
+    public TrainingProgress Progress { get; set; } = default!;
+    public string? ErrorMessage { get; set; }
+    public DateTime StartedAt { get; init; } = DateTime.MinValue;
+    public DateTime? CompletedAt { get; set; }
+    public string? CheckpointPath { get; set; }
+    public Dictionary<string, object> Artifacts { get; init; } = new();
+}
 
 public sealed record TrainingConfig(
     string DatasetPath,
@@ -204,20 +205,21 @@ public enum DeploymentStatus
     Failed
 }
 
-public sealed record Dataset(
-    string DatasetId,
-    string Name,
-    string Version,
-    string Description,
-    string SourcePath,
-    long SizeBytes,
-    int SampleCount,
-    DatasetSchema Schema,
-    DatasetStatistics Statistics,
-    Dictionary<string, string> Tags,
-    DateTime CreatedAt,
-    string CreatedBy
-);
+public sealed record Dataset
+{
+    public string DatasetId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Version { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string SourcePath { get; init; } = string.Empty;
+    public long SizeBytes { get; init; }
+    public int SampleCount { get; init; }
+    public DatasetSchema Schema { get; init; } = default!;
+    public DatasetStatistics Statistics { get; init; } = default!;
+    public Dictionary<string, string> Tags { get; init; } = new();
+    public DateTime CreatedAt { get; init; } = DateTime.MinValue;
+    public string CreatedBy { get; init; } = string.Empty;
+}
 
 public sealed record DatasetSchema(
     Dictionary<string, DatasetColumn> Columns,
@@ -238,18 +240,19 @@ public sealed record DatasetStatistics(
     Dictionary<string, object> FeatureStats
 );
 
-public sealed record Experiment(
-    string ExperimentId,
-    string Name,
-    string Description,
-    string ModelId,
-    ExperimentConfig Config,
-    ExperimentStatus Status,
-    ExperimentResults Results,
-    DateTime CreatedAt,
-    DateTime? StartedAt,
-    DateTime? CompletedAt
-);
+public sealed record Experiment
+{
+    public string ExperimentId { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string ModelId { get; init; } = string.Empty;
+    public ExperimentConfig Config { get; init; } = default!;
+    public ExperimentStatus Status { get; init; } = ExperimentStatus.Created;
+    public ExperimentResults Results { get; init; } = default!;
+    public DateTime CreatedAt { get; init; } = DateTime.MinValue;
+    public DateTime? StartedAt { get; init; }
+    public DateTime? CompletedAt { get; init; }
+}
 
 public sealed record ExperimentConfig(
     string[] ModelVersions,

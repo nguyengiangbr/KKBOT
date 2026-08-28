@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Device.Adb", "src\KKB
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Device.Simulator", "src\KKBOT.Device.Simulator\KKBOT.Device.Simulator.csproj", "{88888888-8888-8888-8888-888888888888}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Device.Win32", "src\Core Platform\KKBOT.Device.Win32\KKBOT.Device.Win32.csproj", "{9A9A9A9A-9A9A-9A9A-9A9A-9A9A9A9A9A9A}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Perception.Abstractions", "src\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj", "{99999999-9999-9999-9999-999999999999}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Perception.OpenCv", "src\KKBOT.Perception.OpenCv\KKBOT.Perception.OpenCv.csproj", "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
@@ -48,17 +50,39 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Domain.Tests", "tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Application.Tests", "tests\KKBOT.Application.Tests\KKBOT.Application.Tests.csproj", "{88888888-9999-0000-1111-222222222222}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Workflow.Tests", "tests\KKBOT.Workflow.Tests\KKBOT.Workflow.Tests.csproj", "{99999999-0000-1111-2222-333333333333}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Perception.Tests", "tests\KKBOT.Perception.Tests\KKBOT.Perception.Tests.csproj", "{BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.AI.Tests", "tests\KKBOT.AI.Tests\KKBOT.AI.Tests.csproj", "{CCCCCCCC-DDDD-EEEE-FFFF-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.Loader.Tests", "tests\KKBOT.Plugin.Loader.Tests\KKBOT.Plugin.Loader.Tests.csproj", "{DDDDDDDD-EEEE-FFFF-0000-111111111111}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Orchestration.Tests", "tests\KKBOT.Orchestration.Tests\KKBOT.Orchestration.Tests.csproj", "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Perception.Tests", "tests\KKBOT.Perception.Tests\KKBOT.Perception.Tests.csproj", "{BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Observability.Tests", "tests\KKBOT.Observability.Tests\KKBOT.Observability.Tests.csproj", "{BBBBBBBB-CCCC-DDDD-EEEE-FFFFFFFFFFFF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Persistence.Tests", "tests\KKBOT.Persistence.Tests\KKBOT.Persistence.Tests.csproj", "{CCCCCCCC-DDDD-EEEE-FFFF-000000000000}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.IntegrationTests", "tests\KKBOT.IntegrationTests\KKBOT.IntegrationTests.csproj", "{DDDDDDDD-EEEE-FFFF-0000-111111111111}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Security.Tests", "tests\KKBOT.Security.Tests\KKBOT.Security.Tests.csproj", "{EEEEEEEE-FFFF-0000-1111-222222222222}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.StressTests", "tests\KKBOT.StressTests\KKBOT.StressTests.csproj", "{EEEEEEEE-FFFF-0000-1111-222222222222}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Orchestration.Advanced.Tests", "tests\KKBOT.Orchestration.Advanced.Tests\KKBOT.Orchestration.Advanced.Tests.csproj", "{FFFFFFFF-EEEE-DDDD-CCCC-BBBBBBBBBBBB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.PluginMarketplace.Tests", "tests\KKBOT.PluginMarketplace.Tests\KKBOT.PluginMarketplace.Tests.csproj", "{11111111-2222-3333-4444-555555555555}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Identity.Tests", "tests\KKBOT.Identity.Tests\KKBOT.Identity.Tests.csproj", "{22222222-3333-4444-5555-666666666666}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.AI.Pipeline.Tests", "tests\KKBOT.AI.Pipeline.Tests\KKBOT.AI.Pipeline.Tests.csproj", "{33333333-4444-5555-6666-777777777777}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Marketplace.Server.Tests", "tests\KKBOT.Marketplace.Server.Tests\KKBOT.Marketplace.Server.Tests.csproj", "{44444444-5555-6666-7777-888888888888}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.VisualScripting.Tests", "tests\KKBOT.VisualScripting.Tests\KKBOT.VisualScripting.Tests.csproj", "{55555555-6666-7777-8888-999999999999}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.AI.Optimization.Tests", "tests\KKBOT.AI.Optimization.Tests\KKBOT.AI.Optimization.Tests.csproj", "{66666666-7777-8888-9999-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Collaboration.Tests", "tests\KKBOT.Collaboration.Tests\KKBOT.Collaboration.Tests.csproj", "{77777777-8888-9999-0000-111111111111}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.NetworkProxy.Tests", "tests\KKBOT.Plugin.NetworkProxy.Tests\KKBOT.Plugin.NetworkProxy.Tests.csproj", "{C2C2C2C2-C2C2-C2C2-C2C2-C2C2C2C2C2C2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.SystemHealthCheck", "tests\KKBOT.SystemHealthCheck\KKBOT.SystemHealthCheck.csproj", "{88888888-9999-0000-1111-222222222222}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -98,6 +122,10 @@ Global
 		{88888888-8888-8888-8888-888888888888}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{88888888-8888-8888-8888-888888888888}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{88888888-8888-8888-8888-888888888888}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A9A9A9A-9A9A-9A9A-9A9A-9A9A9A9A9A9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A9A9A9A-9A9A-9A9A-9A9A-9A9A9A9A9A9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A9A9A9A-9A9A-9A9A-9A9A-9A9A9A9A9A9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A9A9A9A-9A9A-9A9A-9A9A-9A9A9A9A9A9A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{99999999-9999-9999-9999-999999999999}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99999999-9999-9999-9999-999999999999}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{99999999-9999-9999-9999-999999999999}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -199,17 +227,12 @@ EndProject
 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.AccountLogin", "src\KKBOT.Plugin.AccountLogin\KKBOT.Plugin.AccountLogin.csproj", "{B1B1B1B1-B1B1-B1B1-B1B1-B1B1B1B1B1B1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.AntiDetection", "src\KKBOT.Plugin.AntiDetection\KKBOT.Plugin.AntiDetection.csproj", "{B2B2B2B2-B2B2-B2B2-B2B2-B2B2B2B2B2B2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.AntiDetection", "src\KKBOT.Plugin.AntiDetection\KKBOT.Plugin.AntiDetection.csproj", "{B2B2B2B2-B2B2B2B2-B2B2-B2B2-B2B2B2B2B2B2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.ResourceOptimizer", "src\KKBOT.Plugin.ResourceOptimizer\KKBOT.Plugin.ResourceOptimizer.csproj", "{B3B3B3B3-B3B3-B3B3-B3B3-B3B3B3B3B3B3}"
 EndProject
 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.NetworkProxy", "src\KKBOT.Plugin.NetworkProxy\KKBOT.Plugin.NetworkProxy.csproj", "{C1C1C1C1-C1C1-C1C1-C1C1-C1C1C1C1C1C1}"
-EndProject
-
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.NetworkProxy", "src\KKBOT.Plugin.NetworkProxy\KKBOT.Plugin.NetworkProxy.csproj", "{C1C1C1C1-C1C1-C1C1-C1C1-C1C1C1C1C1C1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.NetworkProxy.Tests", "tests\KKBOT.Plugin.NetworkProxy.Tests\KKBOT.Plugin.NetworkProxy.Tests.csproj", "{C2C2C2C2-C2C2-C2C2-C2C2-C2C2C2C2C2C2}"
 EndProject
 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Plugin.LogisticsSurvival", "src\KKBOT.Plugin.LogisticsSurvival\KKBOT.Plugin.LogisticsSurvival.csproj", "{D1D1D1D1-D1D1-D1D1-D1D1-D1D1D1D1D1D1}"
@@ -227,7 +250,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Performance.Optimizat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Performance.Profiling", "src\KKBOT.Performance.Profiling\KKBOT.Performance.Profiling.csproj", "{B3B3B3B3-B3B3-B3B3-B3B3-B3B3B3B3B3B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Performance.Pooling", "src\KKBOT.Performance.Pooling\KKBOT.Performance.Pooling.csproj", "{B4B4B4B4-B4B4-B4B4-B4B4-B4B4B4B4B4B4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Performance.Pooling", "src\KKBOT.Performance.Pooling\KKBOT.Performance.Pooling.csproj", "{B4B4B4B4-B4B4B4B4-B4B4-B4B4B4B4B4B4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Performance.Async", "src\KKBOT.Performance.Async\KKBOT.Performance.Async.csproj", "{B5B5B5B5-B5B5-B5B5-B5B5-B5B5B5B5B5B5}"
 EndProject
@@ -235,64 +258,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.CLI", "src\KKBOT.CLI\KKBOT.CLI.csproj", "{C4C4C4C4-C4C4-C4C4-C4C4-C4C4C4C4C4C4}"
 EndProject
 
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform", "src\KKBOT.MLPlatform\KKBOT.MLPlatform.csproj", "{M1M1M1M1-M1M1-M1M1-M1M1-M1M1M1M1M1M1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.ModelServer", "src\KKBOT.MLPlatform.ModelServer\KKBOT.MLPlatform.ModelServer.csproj", "{M2M2M2M2-M2M2-M2M2-M2M2-M2M2M2M2M2M2}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.FeatureStore", "src\KKBOT.MLPlatform.FeatureStore\KKBOT.MLPlatform.FeatureStore.csproj", "{M3M3M3M3-M3M3-M3M3-M3M3-M3M3M3M3M3M3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.Distillation", "src\KKBOT.MLPlatform.Distillation\KKBOT.MLPlatform.Distillation.csproj", "{M4M4M4M4-M4M4-M4M4-M4M4-M4M4M4M4M4M4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.OnlineLearning", "src\KKBOT.MLPlatform.OnlineLearning\KKBOT.MLPlatform.OnlineLearning.csproj", "{M5M5M5M5-M5M5-M5M5-M5M5-M5M5M5M5M5M5}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.Abstractions", "src\KKBOT.MLPlatform.Abstractions\KKBOT.MLPlatform.Abstractions.csproj", "{M6M6M6M6-M6M6-M6M6-M6M6-M6M6M6M6M6M6}"
-EndProject
-
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform", "src\KKBOT.MLPlatform\KKBOT.MLPlatform.csproj", "{M1M1M1M1-M1M1-M1M1-M1M1-M1M1M1M1M1M1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.ModelServer", "src\KKBOT.MLPlatform.ModelServer\KKBOT.MLPlatform.ModelServer.csproj", "{M2M2M2M2-M2M2-M2M2-M2M2-M2M2M2M2M2M2}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.FeatureStore", "src\KKBOT.MLPlatform.FeatureStore\KKBOT.MLPlatform.FeatureStore.csproj", "{M3M3M3M3-M3M3-M3M3-M3M3-M3M3M3M3M3M3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.Distillation", "src\KKBOT.MLPlatform.Distillation\KKBOT.MLPlatform.Distillation.csproj", "{M4M4M4M4-M4M4-M4M4-M4M4-M4M4M4M4M4M4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.OnlineLearning", "src\KKBOT.MLPlatform.OnlineLearning\KKBOT.MLPlatform.OnlineLearning.csproj", "{M5M5M5M5-M5M5-M5M5-M5M5-M5M5M5M5M5M5}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.ABTesting", "src\KKBOT.MLPlatform.ABTesting\KKBOT.MLPlatform.ABTesting.csproj", "{M6M6M6M6-M6M6-M6M6-M6M6-M6M6M6M6M6M6}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.MLPlatform.Abstractions", "src\KKBOT.MLPlatform.Abstractions\KKBOT.MLPlatform.Abstractions.csproj", "{M7M7M7M7-M7M7-M7M7-M7M7-M7M7M7M7M7M7}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Marketplace", "src\KKBOT.Marketplace\KKBOT.Marketplace.csproj", "{MP1MP1MP1-MP1M-P1MP-1MP1-MP1MP1MP1MP1}"
 EndProject
 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real", "src\KKBOT.Sim2Real\KKBOT.Sim2Real.csproj", "{S1S1S1S1-S1S1-S1S1-S1S1-S1S1S1S1S1S1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.DomainRandomization", "src\KKBOT.Sim2Real.DomainRandomization\KKBOT.Sim2Real.DomainRandomization.csproj", "{S2S2S2S2-S2S2-S2S2-S2S2-S2S2S2S2S2S2}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.DomainAdaptation", "src\KKBOT.Sim2Real.DomainAdaptation\KKBOT.Sim2Real.DomainAdaptation.csproj", "{S3S3S3S3-S3S3-S3S3-S3S3-S3S3S3S3S3S3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.RewardModeling", "src\KKBOT.Sim2Real.RewardModeling\KKBOT.Sim2Real.RewardModeling.csproj", "{S4S4S4S4-S4S4-S4S4-S4S4-S4S4S4S4S4S4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.PolicyDeployment", "src\KKBOT.Sim2Real.PolicyDeployment\KKBOT.Sim2Real.PolicyDeployment.csproj", "{S5S5S5S5-S5S5-S5S5-S5S5-S5S5S5S5S5S5}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.Evaluation", "src\KKBOT.Sim2Real.Evaluation\KKBOT.Sim2Real.Evaluation.csproj", "{S6S6S6S6-S6S6-S6S6-S6S6-S6S6S6S6S6S6}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.Abstractions", "src\KKBOT.Sim2Real.Abstractions\KKBOT.Sim2Real.Abstractions.csproj", "{S7S7S7S7-S7S7-S7S7-S7S7-S7S7S7S7S7S7}"
-EndProject
-
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real", "src\KKBOT.Sim2Real\KKBOT.Sim2Real.csproj", "{S1S1S1S1-S1S1-S1S1-S1S1-S1S1S1S1S1S1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.Abstractions", "src\KKBOT.Sim2Real.Abstractions\KKBOT.Sim2Real.Abstractions.csproj", "{S7S7S7S7-S7S7-S7S7-S7S7-S7S7S7S7S7S7}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.DomainRandomization", "src\KKBOT.Sim2Real.DomainRandomization\KKBOT.Sim2Real.DomainRandomization.csproj", "{S2S2S2S2-S2S2-S2S2-S2S2-S2S2S2S2S2S2}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.DomainAdaptation", "src\KKBOT.Sim2Real.DomainAdaptation\KKBOT.Sim2Real.DomainAdaptation.csproj", "{S3S3S3S3-S3S3-S3S3-S3S3-S3S3S3S3S3S3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.RewardModeling", "src\KKBOT.Sim2Real.RewardModeling\KKBOT.Sim2Real.RewardModeling.csproj", "{S4S4S4S4-S4S4-S4S4-S4S4-S4S4S4S4S4S4}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.PolicyDeployment", "src\KKBOT.Sim2Real.PolicyDeployment\KKBOT.Sim2Real.PolicyDeployment.csproj", "{S5S5S5S5-S5S5-S5S5-S5S5-S5S5S5S5S5S5}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.Sim2Real.Evaluation", "src\KKBOT.Sim2Real.Evaluation\KKBOT.Sim2Real.Evaluation.csproj", "{S6S6S6S6-S6S6-S6S6-S6S6-S6S6S6S6S6S6}"
 EndProject
 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KKBOT.LicenseServer", "src\KKBOT.LicenseServer\KKBOT.LicenseServer.csproj", "{L1L1L1L1-L1L1-L1L1-L1L1-L1L1L1L1L1L1}"

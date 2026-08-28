@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>KKBOT.PluginHost.SampleCore</AssemblyName>
+    <RootNamespace>KKBOT.PluginHost.SampleCore</RootNamespace>
+    <NoWarn>$(NoWarn);SA1633;SA1028;SA1518;SA1402;SA1611;SA1615</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.PluginHost.Core\KKBOT.PluginHost.Core.csproj" />
+    <ProjectReference Include="..\KKBOT.PluginHost.Navigation\KKBOT.PluginHost.Navigation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <Target Name="CopyToDemoPlugins" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)"
+          DestinationFolder="$(MSBuildProjectDirectory)\..\KKBOT.PluginHost.Demo\bin\$(Configuration)\net10.0\plugins"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

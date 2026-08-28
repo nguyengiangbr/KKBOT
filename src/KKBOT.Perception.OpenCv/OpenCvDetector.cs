@@ -1,4 +1,5 @@
 using KKBOT.Perception.Abstractions;
+using KKBOT.Device.Abstractions;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 

@@ -235,7 +235,7 @@ public sealed class ParticipantService : IParticipantService
         }
         else
         {
-            var participant = new SessionParticipant
+            var newParticipant = new SessionParticipant
             {
                 SessionId = sessionId,
                 UserId = request.UserId,
@@ -247,7 +247,7 @@ public sealed class ParticipantService : IParticipantService
                 Permissions = GetDefaultPermissions(request.RequestedRole)
             };
 
-            _dbContext.SessionParticipants.Add(participant);
+            _dbContext.SessionParticipants.Add(newParticipant);
         }
 
         await _dbContext.SaveChangesAsync(CancellationToken.None);
@@ -282,7 +282,7 @@ public sealed class ParticipantService : IParticipantService
 
         // Check permissions
         var actor = await _dbContext.SessionParticipants.FirstOrDefaultAsync(p => p.SessionId == participant.SessionId && p.UserId == actorId, CancellationToken.None);
-        if (actor == null || !actor.Permissions.CanManageParticipants)
+        if (actor == null || !actor.Capabilities.CanManageParticipants)
             throw new UnauthorizedAccessException("Not authorized to update participant");
 
         if (request.Role.HasValue) participant.Role = request.Role.Value;
@@ -311,7 +311,7 @@ public sealed class ParticipantService : IParticipantService
     public async Task<bool> RemoveParticipantAsync(Guid sessionId, string userId, string actorId, CancellationToken ct = default)
     {
         var actor = await _dbContext.SessionParticipants.FirstOrDefaultAsync(p => p.SessionId == sessionId && p.UserId == actorId, CancellationToken.None);
-        if (actor == null || !actor.Permissions.CanManageParticipants)
+        if (actor == null || !actor.Capabilities.CanManageParticipants)
             throw new UnauthorizedAccessException("Not authorized to remove participant");
 
         var participant = await _dbContext.SessionParticipants
@@ -349,7 +349,7 @@ public sealed class ParticipantService : IParticipantService
     public async Task<SessionParticipant> GrantControlAsync(Guid sessionId, string targetUserId, string actorId, CancellationToken ct = default)
     {
         var actor = await _dbContext.SessionParticipants.FirstOrDefaultAsync(p => p.SessionId == sessionId && p.UserId == actorId, CancellationToken.None);
-        if (actor == null || !actor.Permissions.CanManageParticipants)
+        if (actor == null || !actor.Capabilities.CanManageParticipants)
             throw new UnauthorizedAccessException("Not authorized to grant control");
 
         var target = await _dbContext.SessionParticipants
@@ -369,7 +369,7 @@ public sealed class ParticipantService : IParticipantService
     public async Task<SessionParticipant> RevokeControlAsync(Guid sessionId, string targetUserId, string actorId, CancellationToken ct = default)
     {
         var actor = await _dbContext.SessionParticipants.FirstOrDefaultAsync(p => p.SessionId == sessionId && p.UserId == actorId, CancellationToken.None);
-        if (actor == null || !actor.Permissions.CanManageParticipants)
+        if (actor == null || !actor.Capabilities.CanManageParticipants)
             throw new UnauthorizedAccessException("Not authorized to revoke control");
 
         var target = await _dbContext.SessionParticipants

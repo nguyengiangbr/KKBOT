@@ -1,54 +1,25 @@
 <Window x:Class="KKBOT.ControlCenter.Wpf.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:vm="clr-namespace:KKBOT.ControlCenter.Wpf.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         mc:Ignorable="d"
-        Title="KKBOT Control Center" Height="800" Width="1200">
-
-    <Window.DataContext>
-        <vm:DashboardViewModel />
-    </Window.DataContext>
-
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Menu Grid.Row="0">
-            <MenuItem Header="File">
-                <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
-            </MenuItem>
-            <MenuItem Header="Help">
-                <MenuItem Header="About" Command="{Binding AboutCommand}" />
-            </MenuItem>
-        </Menu>
-        <TabControl Grid.Row="1">
-            <TabItem Header="Dashboard">
-                <StackPanel Margin="10">
-                    <TextBlock Text="Instances" FontWeight="Bold" FontSize="14" />
-                    <DataGrid ItemsSource="{Binding Instances}" AutoGenerateColumns="False" Height="300">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="*" />
-                            <DataGridTextColumn Header="State" Binding="{Binding State}" Width="*" />
-                            <DataGridTextColumn Header="Device" Binding="{Binding DeviceName}" Width="*" />
-                            <DataGridTextColumn Header="Module" Binding="{Binding ModuleName}" Width="*" />
-                            <DataGridTextColumn Header="Profile" Binding="{Binding ProfileName}" Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
-            </TabItem>
-            <TabItem Header="Jobs">
-                <DataGrid ItemsSource="{Binding Jobs}" AutoGenerateColumns="False">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="*" />
-                        <DataGridTextColumn Header="State" Binding="{Binding State}" Width="*" />
-                        <DataGridTextColumn Header="Task" Binding="{Binding TaskId}" Width="*" />
-                        <DataGridTextColumn Header="Runs" Binding="{Binding TotalRuns}" Width="*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </TabItem>
-        </TabControl>
-    </Grid>
+        Title="KKBOT Control Center" Height="600" Width="900">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Left" Width="220" Background="#1E1E1E">
+            <TextBlock Text="KKBOT Plugins" FontWeight="Bold" Foreground="White" Margin="10,10,10,4"/>
+            <ListBox ItemsSource="{Binding Plugins}"
+                     SelectedItem="{Binding SelectedPlugin, Mode=TwoWay}"
+                     Background="Transparent" BorderThickness="0" Foreground="White">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding DisplayName}" Margin="4,6"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </StackPanel>
+        <Border Background="#252526">
+            <ContentControl Content="{Binding SelectedView}" Margin="12" />
+        </Border>
+    </DockPanel>
 </Window>

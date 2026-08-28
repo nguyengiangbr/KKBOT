@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using KKBOT.AI.Pipeline;
@@ -23,9 +24,14 @@ public class AIPipelineTests
             })
             .Build();
 
+        // Clean any persisted pipeline state from previous runs so each test starts fresh.
+        var storageRoot = "data/ai-pipeline-test";
+        if (Directory.Exists(storageRoot))
+            Directory.Delete(storageRoot, true);
+
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(config);
-        services.AddLogging(b => b.AddConsole());
+        services.AddLogging();
         services.AddKkbotAIPipeline(config);
         
         var provider = services.BuildServiceProvider();
@@ -203,7 +209,7 @@ public class AIPipelineTests
             new DeploymentConfig { MinReplicas = 1, MaxReplicas = 3, TargetCpuUtilization = 70 }
         );
 
-        var deployment = await deploymentService.DeployAsync(deployRequest, CancellationToken.None);
+        var deployment = await deploymentService.DeployModelAsync(deployRequest, CancellationToken.None);
         Assert.NotNull(deployment);
         Assert.Equal("deploy-model", deployment.ModelId);
         Assert.Equal(DeploymentStatus.Running, deployment.Status);
@@ -333,11 +339,7 @@ public class AIPipelineTests
 
         var definition = new FeatureDefinition(
             "feature_a",
-            "Feature A description",
-            "float",
-            "computed",
-            new Dictionary<string, object>(),
-            DateTime.UtcNow
+            "Feature A description"
         );
 
         await featureStore.RegisterFeatureAsync(definition, CancellationToken.None);
@@ -351,9 +353,39 @@ public class AIPipelineTests
         var provider = CreateProvider();
         using var scope = provider.CreateScope();
         var monitor = scope.ServiceProvider.GetRequiredService<IModelMonitor>();
+        var registry = scope.ServiceProvider.GetRequiredService<IModelRegistry>();
+        var deploymentService = scope.ServiceProvider.GetRequiredService<IModelDeploymentService>();
 
-        // This will use the mock deployment service
-        var report = await monitor.GenerateReportAsync("test-model", "deployment-1", MonitoringPeriod.Last24Hours, CancellationToken.None);
+        // Register and deploy a model so the deployment exists for monitoring.
+        var model = new ModelMetadata(
+            "test-model",
+            "Test Model",
+            "1.0.0",
+            ModelType.Classification,
+            ModelFramework.ONNX,
+            "Model for monitoring",
+            "Test",
+            new Dictionary<string, string>(),
+            new ModelMetrics(0.9, 0.88, 0.89, 0.885, 0.15, new(), DateTime.UtcNow, "1.0"),
+            new ModelSchema("input", "float32", new[] { -1, 768 }),
+            new ModelSchema("output", "float32", new[] { -1, 10 }),
+            new Dictionary<string, object>(),
+            DateTime.UtcNow,
+            DateTime.UtcNow
+        );
+
+        await registry.RegisterModelAsync(model, CancellationToken.None);
+
+        var deployment = await deploymentService.DeployModelAsync(
+            new DeployModelRequest(
+                "test-model",
+                "1.0.0",
+                "Test Deployment",
+                DeploymentTarget.Local,
+                new DeploymentConfig { MinReplicas = 1, MaxReplicas = 3, TargetCpuUtilization = 70 }),
+            CancellationToken.None);
+
+        var report = await monitor.GenerateReportAsync("test-model", deployment.DeploymentId, MonitoringPeriod.Last24Hours, CancellationToken.None);
 
         Assert.NotNull(report);
         Assert.Equal("test-model", report.ModelId);

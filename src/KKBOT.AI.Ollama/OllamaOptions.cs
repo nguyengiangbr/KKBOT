@@ -16,6 +16,11 @@ public sealed class OllamaOptions
     public string Model { get; set; } = "llama2";
 
     /// <summary>
+    /// Default vision model name to use.
+    /// </summary>
+    public string VisionModel { get; set; } = "llava";
+
+    /// <summary>
     /// Default request parameters (e.g., temperature, max tokens).
     /// </summary>
     public OllamaRequestParameters DefaultParams { get; set; } = new();

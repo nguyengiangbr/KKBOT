@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 using KKBOT.Perception.Abstractions;
-using KKBOT.Domain.Models.Perception;
+using KKBOT.Device.Abstractions;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -13,5 +13,13 @@ public sealed class PlaceholderDetector : IGameDetector
     public string Id => "opencv-placeholder";
     public string Name => "OpenCV Placeholder Detector";
     public double RequiredConfidence => 0.9;
-    public Task<DetectorResult> DetectAsync(Frame frame, CancellationToken cancellationToken) => Task.FromResult(new DetectorResult(Id, Name, 1.0, true, "placeholder", 1.0));
+    public Task<DetectorResult> DetectAsync(Frame frame, CancellationToken cancellationToken) => Task.FromResult(new DetectorResult
+    {
+        DetectorId = Id,
+        DetectorName = Name,
+        Confidence = 1.0,
+        IsMatch = true,
+        DetectedValue = "placeholder",
+        RawScore = 1.0
+    });
 }

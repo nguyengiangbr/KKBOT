@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using KKBOT.VisualScripting.Models;
+using KKBOT.VisualScripting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -574,7 +574,7 @@ public sealed class ConditionNodeExecutor : INodeExecutor
 
     public Task<NodeExecutionResult> ExecuteAsync(NodeExecutionContext context, CancellationToken ct = default)
     {
-        var condition = context.Node.Properties.TryGetValue("condition", out var cond) ? cond?.ToString() : "true";
+        var condition = context.Node.Properties.TryGetValue("condition", out var cond) ? cond?.ToString() ?? "true" : "true";
         var result = false;
 
         try
@@ -742,7 +742,7 @@ public sealed class GetVariableNodeExecutor : INodeExecutor
             CompletedAt = DateTime.UtcNow,
             Outputs = new Dictionary<string, object>
             {
-                ["value"] = context.Variables.TryGetValue(name ?? "", out var val) ? val : null
+                ["value"] = context.Variables.TryGetValue(name ?? "", out var val) ? val! : null!
             }
         };
         return Task.FromResult(result);
@@ -762,7 +762,25 @@ public sealed class LogNodeExecutor : INodeExecutor
         
         if (Enum.TryParse<LogLevel>(level, out var logLevel))
         {
-            context.Logger.Log(logLevel, "Workflow Log [{NodeId}]: {Message}", context.NodeId, message);
+            switch (logLevel)
+            {
+                case LogLevel.Warning:
+                    context.Logger.LogWarning("Workflow Log [{NodeId}]: {Message}", context.NodeId, message);
+                    break;
+                case LogLevel.Error:
+                case LogLevel.Critical:
+                    context.Logger.LogError("Workflow Log [{NodeId}]: {Message}", context.NodeId, message);
+                    break;
+                case LogLevel.Debug:
+                    context.Logger.LogDebug("Workflow Log [{NodeId}]: {Message}", context.NodeId, message);
+                    break;
+                case LogLevel.Trace:
+                    context.Logger.LogTrace("Workflow Log [{NodeId}]: {Message}", context.NodeId, message);
+                    break;
+                default:
+                    context.Logger.LogInformation("Workflow Log [{NodeId}]: {Message}", context.NodeId, message);
+                    break;
+            }
         }
 
         var result = new NodeExecutionResult
@@ -774,7 +792,7 @@ public sealed class LogNodeExecutor : INodeExecutor
             Outputs = new Dictionary<string, object>
             {
                 ["logged"] = true,
-                ["message"] = message
+                ["message"] = message!
             }
         };
         return Task.FromResult(result);
@@ -790,8 +808,8 @@ public sealed class HttpRequestNodeExecutor : INodeExecutor
     public async Task<NodeExecutionResult> ExecuteAsync(NodeExecutionContext context, CancellationToken ct = default)
     {
         var url = context.Inputs.TryGetValue("url", out var urlObj) ? urlObj?.ToString() : "";
-        var method = context.Node.Properties.TryGetValue("method", out var methodObj) ? methodObj?.ToString() : "GET";
-        var headers = context.Inputs.TryGetValue("headers", out var headersObj) ? headersObj as Dictionary<string, string> : new Dictionary<string, string>();
+        var method = context.Node.Properties.TryGetValue("method", out var methodObj) ? methodObj?.ToString() ?? "GET" : "GET";
+        var headers = context.Inputs.TryGetValue("headers", out var headersObj) ? headersObj as Dictionary<string, string> ?? new Dictionary<string, string>() : new Dictionary<string, string>();
         var body = context.Inputs.TryGetValue("body", out var bodyObj) ? bodyObj : null;
 
         if (string.IsNullOrEmpty(url))
@@ -807,7 +825,7 @@ public sealed class HttpRequestNodeExecutor : INodeExecutor
         try
         {
             using var httpClient = new HttpClient();
-            using var request = new HttpRequestMessage(new HttpMethod(method), url);
+            using var request = new HttpRequestMessage(new HttpMethod(method!), url);
 
             foreach (var header in headers)
             {
@@ -991,7 +1009,7 @@ public sealed class DeviceCaptureNodeExecutor : INodeExecutor
                 {
                     ["frame"] = new byte[0],
                     ["timestamp"] = DateTime.UtcNow,
-                    ["deviceId"] = deviceId
+                    ["deviceId"] = deviceId!
                 }
             };
             return result;
@@ -1033,8 +1051,8 @@ public sealed class DeviceInputNodeExecutor : INodeExecutor
                 Outputs = new Dictionary<string, object>
                 {
                     ["sent"] = true,
-                    ["action"] = action,
-                    ["deviceId"] = deviceId
+                    ["action"] = action!,
+                    ["deviceId"] = deviceId!
                 }
             };
             return result;
@@ -1076,7 +1094,7 @@ public sealed class PerceptionNodeExecutor : INodeExecutor
                 {
                     ["detections"] = new List<object>(),
                     ["confidence"] = 0.95,
-                    ["detectorId"] = detectorId
+                    ["detectorId"] = detectorId!
                 }
             };
             return result;
@@ -1264,7 +1282,7 @@ public sealed class BranchNodeExecutor : INodeExecutor
 
     public async Task<NodeExecutionResult> ExecuteAsync(NodeExecutionContext context, CancellationToken ct = default)
     {
-        var branches = context.Node.Properties.TryGetValue("branches", out var branchesObj) ? branchesObj as List<BranchDefinition> : new List<BranchDefinition>();
+        var branches = context.Node.Properties.TryGetValue("branches", out var branchesObj) ? branchesObj as List<BranchDefinition> ?? new List<BranchDefinition>() : new List<BranchDefinition>();
         var input = context.Inputs.TryGetValue("input", out var inputObj) ? inputObj : null;
 
         var results = new Dictionary<string, object>();

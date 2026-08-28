@@ -25,6 +25,9 @@ public static class MarketplaceExtensions
         // Installer
         services.AddSingleton<IPluginInstaller, LocalPluginInstaller>();
 
+        // Expose the concrete PluginLoader as IPluginLoader for the installer
+        services.AddSingleton<IPluginLoader>(sp => sp.GetRequiredService<PluginLoader>());
+
         // Ensure PluginLoader is registered (from Plugins.Loader)
         // services.AddSingleton<PluginLoader>(); // Already registered in Orchestration
 

@@ -12,7 +12,7 @@ using Moq;
 using Moq.Protected;
 using Xunit;
 
-namespace KKBOT.AI.Tests;
+namespace KKBOT.AI.Tests
 {
     public class OllamaServiceTests
     {
@@ -20,7 +20,7 @@ namespace KKBOT.AI.Tests;
         public async Task GenerateAsync_ReturnsAiResponse_FromOllamaJson()
         {
             // Arrange: mock HttpMessageHandler to return a known JSON payload
-            var jsonResponse = @"{\"model\":\"test-model\",\"response\":\"Hello world!\",\"done\":true,\"eval_count\":5,\"prompt_eval_count\":1,\"total_duration\":12345}";
+            var jsonResponse = "{\"model\":\"test-model\",\"response\":\"Hello world!\",\"done\":true,\"eval_count\":5,\"prompt_eval_count\":1,\"total_duration\":12345}";
             var handlerMock = new Mock<HttpMessageHandler>();
             handlerMock.Protected()
                 .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())

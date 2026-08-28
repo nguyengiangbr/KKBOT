@@ -67,8 +67,9 @@ public interface IParticipantService
 }
 
 public sealed record JoinSessionRequest(
-    string UserName,
-    string UserAvatar,
+    string UserName = "",
+    string UserAvatar = "",
+    string UserId = "",
     ParticipantRole RequestedRole = ParticipantRole.Viewer
 );
 
@@ -118,9 +119,9 @@ public interface IChatService
 }
 
 public sealed record SendMessageRequest(
-    string Content,
+    string Content = "",
     MessageType Type = MessageType.Text,
-    Dictionary<string, object> Metadata = null
+    Dictionary<string, object>? Metadata = null
 );
 
 public sealed record UpdateMessageRequest(
@@ -203,10 +204,10 @@ public sealed record RecordingFilter(
 
 public enum ExportFormat
 {
-    Custom,
+    Json,
+    Csv,
     WebM,
-    MP4,
-    JSON
+    MP4
 }
 
 public interface IReplayService
@@ -286,9 +287,9 @@ public sealed class ScreenShareSession
     public ScreenShareMode Mode { get; set; } = ScreenShareMode.FullScreen;
     public bool IsActive { get; set; } = true;
     public int Quality { get; set; } = 80;
-    public int FrameRate { get; set; } = 30.
-    public bool IncludeAudio { get; set; } = false.
-    public DateTime StartedAt { get; set; } = DateTime.UtcNow.
+    public int FrameRate { get; set; } = 30;
+    public bool IncludeAudio { get; set; } = false;
+    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
     public DateTime? EndedAt { get; set; }
     public long BytesSent { get; set; }
     public long BytesReceived { get; set; }
@@ -313,7 +314,7 @@ public sealed record CreateWorkspaceRequest(
     WorkspaceType Type,
     WorkspaceContent? InitialContent = null,
     WorkspaceSettings? Settings = null,
-    List<AddCollaboratorRequest> InitialCollaborators = null
+    List<AddCollaboratorRequest>? InitialCollaborators = null
 );
 
 public sealed record UpdateWorkspaceRequest(
@@ -341,8 +342,14 @@ public sealed record WorkspaceOperation(
     int? Position = null,
     string? Text = null,
     int? Length = null,
-    Dictionary<string, object> Attributes = null
-);
+    Dictionary<string, object>? Attributes = null
+)
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid WorkspaceId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public SharedWorkspace Workspace { get; set; } = null!;
+}
 
 public enum OperationType
 {

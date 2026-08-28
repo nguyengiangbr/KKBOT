@@ -10,16 +10,16 @@ namespace KKBOT.Device.Simulator;
 /// </summary>
 public sealed class FakeInputDispatcher : IInputDispatcher
 {
-    private readonly ILogger<FakeInputDispatcher> _logger;
+    private readonly ILogger _logger;
 
-    public FakeInputDispatcher(ILogger<FakeInputDispatcher> logger)
+    public FakeInputDispatcher(ILogger logger)
     {
         _logger = logger;
     }
 
     public Task<DispatchResult> DispatchAsync(InputCommand command, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Simulated dispatch of {CommandType}: {Payload}", command.CommandType, command.Payload);
+        _logger.LogInformation("Simulated dispatch of {CommandType}: {Payload}", command.Type, command.Text);
         var result = new DispatchResult { Success = true, Details = "Simulated dispatch succeeded" };
         return Task.FromResult(result);
     }

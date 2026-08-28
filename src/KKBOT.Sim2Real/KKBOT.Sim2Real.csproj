@@ -16,15 +16,14 @@
     <ProjectReference Include="..\KKBOT.Sim2Real.RewardModeling\KKBOT.Sim2Real.RewardModeling.csproj" />
     <ProjectReference Include="..\KKBOT.Sim2Real.PolicyDeployment\KKBOT.Sim2Real.PolicyDeployment.csproj" />
     <ProjectReference Include="..\KKBOT.Sim2Real.Evaluation\KKBOT.Sim2Real.Evaluation.csproj" />
-    <ProjectReference Include="..\..\KKBOT.Observability\KKBOT.Observability.csproj" />
-    <ProjectReference Include="..\..\KKBOT.MLPlatform.Abstractions\KKBOT.MLPlatform.Abstractions.csproj" />
-    <ProjectReference Include="..\..\KKBOT.MLPlatform.ModelServer\KKBOT.MLPlatform.ModelServer.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.MLPlatform.Abstractions\KKBOT.MLPlatform.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.MLPlatform.ModelServer\KKBOT.MLPlatform.ModelServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 
 </Project>

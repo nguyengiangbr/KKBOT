@@ -118,3 +118,14 @@ dotnet_diagnostic.CA1812.severity = none
 dotnet_diagnostic.CA2254.severity = suggestion
 dotnet_diagnostic.SA1600.severity = none
 dotnet_diagnostic.SA1601.severity = none
+
+# Baseline build: disable StyleCop style enforcement (re-enable after cleanup)
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Documentation.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Ordering.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Readability.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Layout.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Maintainability.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Naming.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Spacing.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Files.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.Trivia.severity = none

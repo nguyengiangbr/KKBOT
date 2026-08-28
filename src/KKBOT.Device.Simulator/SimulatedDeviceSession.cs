@@ -17,14 +17,14 @@ namespace KKBOT.Device.Simulator;
 public sealed class SimulatedDeviceSession : IDeviceSession
 {
     private readonly string _scenarioPath;
-    private readonly ILogger<SimulatedDeviceSession> _logger;
+    private readonly ILogger _logger;
     private readonly ReplayFrameProvider _frameProvider;
     private readonly FakeInputDispatcher _inputDispatcher;
     private readonly ConcurrentQueue<Frame> _frameQueue = new();
     private bool _initialized;
     private CancellationTokenSource? _cts;
 
-    public SimulatedDeviceSession(string scenarioPath, ILogger<SimulatedDeviceSession> logger)
+    public SimulatedDeviceSession(string scenarioPath, ILogger logger)
     {
         _scenarioPath = scenarioPath;
         _logger = logger;
@@ -89,7 +89,13 @@ public sealed class SimulatedDeviceSession : IDeviceSession
     public async Task<InputResult> SendInputAsync(InputCommand command, CancellationToken cancellationToken)
     {
         // Forward to the fake dispatcher which simply logs the action.
-        return await _inputDispatcher.DispatchAsync(command, cancellationToken);
+        var dispatchResult = await _inputDispatcher.DispatchAsync(command, cancellationToken);
+        return new InputResult
+        {
+            IsSuccess = dispatchResult.Success,
+            ErrorMessage = dispatchResult.Success ? null : dispatchResult.Details,
+            Duration = TimeSpan.Zero
+        };
     }
 
     public async Task LaunchApplicationAsync(ApplicationIdentity application, CancellationToken cancellationToken)

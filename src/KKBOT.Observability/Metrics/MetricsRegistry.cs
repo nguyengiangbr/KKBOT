@@ -154,7 +154,7 @@ public sealed class MetricsRegistry : IMetricsRegistry, IDisposable
         AiInferencesTotal = CreateCounter("kkbot_ai_inferences_total", "Total AI inferences");
         AiInferencesFailed = CreateCounter("kkbot_ai_inferences_failed_total", "Failed AI inferences");
         AiInferenceLatencyMs = CreateHistogram("kkbot_ai_inference_latency_ms", "AI inference latency in milliseconds");
-        AiTokensPerRequest = CreateCounter("kkbot_ai_tokens_per_request", "Tokens per AI request");
+        AiTokensPerRequest = CreateHistogram("kkbot_ai_tokens_per_request", "Tokens per AI request");
         AiTokensPerSecond = CreateHistogram("kkbot_ai_tokens_per_second", "Tokens per second during inference");
         AiStreamingChunks = CreateCounter("kkbot_ai_streaming_chunks_total", "Total streaming chunks emitted");
 

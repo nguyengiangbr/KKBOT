@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>KKBOT.PluginHost.Demo</AssemblyName>
+    <RootNamespace>KKBOT.PluginHost.Demo</RootNamespace>
+    <NoWarn>$(NoWarn);SA1633;SA1028;SA1518;SA1402;SA1611;SA1615</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\KKBOT.PluginHost.Core\KKBOT.PluginHost.Core.csproj" />
+    <ProjectReference Include="..\KKBOT.PluginHost.Navigation\KKBOT.PluginHost.Navigation.csproj" />
+    <ProjectReference Include="..\KKBOT.PluginHost.Loader\KKBOT.PluginHost.Loader.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
-using KKBOT.Domain.Models.Perception;
+using KKBOT.Device.Abstractions;
 
 namespace KKBOT.Perception.Abstractions;
 

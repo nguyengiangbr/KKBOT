@@ -14,7 +14,7 @@ public sealed class AdbHealthCheck : IAsyncDisposable
 {
     private readonly string _deviceId;
     private readonly AdbClientOptions _options;
-    private readonly ILogger<AdbHealthCheck> _logger;
+    private readonly ILogger _logger;
     private readonly AdbCommandRunner _commandRunner;
     private bool _disposed;
 
@@ -34,7 +34,7 @@ public sealed class AdbHealthCheck : IAsyncDisposable
     public AdbHealthCheck(
         string deviceId,
         AdbClientOptions options,
-        ILogger<AdbHealthCheck> logger,
+        ILogger logger,
         AdbCommandRunner commandRunner)
     {
         _deviceId = deviceId;
@@ -79,6 +79,16 @@ public sealed class AdbHealthCheck : IAsyncDisposable
 
             // Get current health metrics
             await RefreshHealthMetricsAsync(cancellationToken);
+
+            result.Model = Model;
+            result.Manufacturer = Manufacturer;
+            result.AndroidVersion = AndroidVersion;
+            result.Abi = Abi;
+            result.ScreenWidth = ScreenWidth;
+            result.ScreenHeight = ScreenHeight;
+            result.ScreenDensity = ScreenDensity;
+            result.TotalStorage = TotalStorage;
+            result.FreeStorage = FreeStorage;
 
             result.IsHealthy = true;
             result.CpuUsage = await GetCpuUsageAsync(cancellationToken);

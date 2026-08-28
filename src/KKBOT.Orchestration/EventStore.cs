@@ -6,13 +6,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using KKBOT.Domain.Models;
 using KKBOT.Observability;
-using KKBOT.Observability.Tracing;
+using KKBOT.Observability.Metrics;
 
 namespace KKBOT.Orchestration;
 
@@ -42,10 +43,10 @@ public sealed class EventStore : IEventStore, IAsyncDisposable
         _options = options.Value;
         _metrics = metrics;
 
-        if (_options.EnableSnapshots && _options.SnapshotInterval > 0)
+        if (_options.EnableSnapshots && _options.SnapshotInterval is { } snapshotInterval && snapshotInterval > TimeSpan.Zero)
         {
-            _snapshotTimer = new Timer(async _ => await CreateSnapshotsAsync(_shutdownCts.Token), 
-                null, _options.SnapshotInterval, _options.SnapshotInterval);
+            _snapshotTimer = new Timer(async _ => await CreateSnapshotsAsync(_shutdownCts.Token),
+                null, snapshotInterval, snapshotInterval);
         }
 
         _logger.LogInformation("EventStore initialized with snapshots: {Enabled}, interval: {Interval}s", 
@@ -63,7 +64,7 @@ public sealed class EventStore : IEventStore, IAsyncDisposable
             Sequence = sequence,
             EventId = Guid.NewGuid(),
             EventType = @event.GetType().Name,
-            EventData = JsonSerializer.Serialize(@event, EventJsonContext.Default),
+            EventData = JsonSerializer.Serialize(@event, @event.GetType(), EventJsonContext.Default),
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = GetCorrelationId(@event),
             CausationId = GetCausationId(@event)
@@ -84,6 +85,12 @@ public sealed class EventStore : IEventStore, IAsyncDisposable
 
         activity?.SetStatus(ActivityStatusCode.Ok);
     }
+
+    /// <summary>
+    /// Fire-and-forget convenience wrapper around <see cref="AppendAsync"/>.
+    /// </summary>
+    public Task Append(IOrchestrationEvent @event, CancellationToken cancellationToken = default)
+        => AppendAsync(@event, cancellationToken);
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<StoredEvent>> GetEventsAsync(
@@ -146,7 +153,7 @@ public sealed class EventStore : IEventStore, IAsyncDisposable
         await _snapshotLock.WaitAsync(cancellationToken);
         try
         {
-            var events = await GetEventsAsync(aggregateId, cancellationToken);
+            var events = await GetEventsAsync(aggregateId);
             if (events.Count == 0) return;
 
             var lastEvent = events.Last();
@@ -154,7 +161,7 @@ public sealed class EventStore : IEventStore, IAsyncDisposable
             {
                 AggregateId = aggregateId,
                 Sequence = lastEvent.Sequence,
-                StateJson = JsonSerializer.Serialize(events, EventJsonContext.Default),
+                StateJson = JsonSerializer.Serialize(events, events.GetType(), EventJsonContext.Default),
                 Timestamp = DateTimeOffset.UtcNow,
                 EventCount = events.Count
             };
@@ -329,9 +336,9 @@ public sealed record ProjectionState
 {
     public string Name { get; init; } = string.Empty;
     public int Version { get; init; } = 1;
-    public long LastSequence { get; init; }
-    public string StateJson { get; init; } = "{}";
-    public DateTimeOffset LastUpdated { get; init; }
+    public long LastSequence { get; set; }
+    public string StateJson { get; set; } = "{}";
+    public DateTimeOffset LastUpdated { get; set; }
     public bool IsHealthy { get; init; } = true;
     public string? ErrorMessage { get; init; }
 }

@@ -111,12 +111,24 @@ public record ApplicationIdentity
 /// </summary>
 public record HealthCheckResult
 {
-    public bool IsHealthy { get; init; }
-    public bool IsConnected { get; init; }
-    public double? CpuUsage { get; init; }
-    public long? MemoryUsage { get; init; }
-    public int? BatteryLevel { get; init; }
-    public bool? IsCharging { get; init; }
-    public double? LatencyMs { get; init; }
-    public string? ErrorMessage { get; init; }
+    public bool IsHealthy { get; set; }
+    public bool IsConnected { get; set; }
+    public double? CpuUsage { get; set; }
+    public long? MemoryUsage { get; set; }
+    public int? BatteryLevel { get; set; }
+    public bool? IsCharging { get; set; }
+    public double? LatencyMs { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? Details { get; set; }
+
+    // Detailed device information
+    public string? Model { get; set; }
+    public string? Manufacturer { get; set; }
+    public string? AndroidVersion { get; set; }
+    public string? Abi { get; set; }
+    public int ScreenWidth { get; set; }
+    public int ScreenHeight { get; set; }
+    public int ScreenDensity { get; set; }
+    public long? TotalStorage { get; set; }
+    public long? FreeStorage { get; set; }
 }

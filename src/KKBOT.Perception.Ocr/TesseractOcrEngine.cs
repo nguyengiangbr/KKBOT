@@ -26,7 +26,7 @@ public sealed class TesseractOcrEngine : IOcrEngine
         using var page = _engine.Process(pix);
         var text = page.GetText();
         var confidence = page.GetMeanConfidence();
-        var result = new OcrResult { Text = text, Confidence = confidence };
+        var result = new OcrResult(text, confidence);
         _logger.LogDebug("OCR recognized text with confidence {Confidence:P2}", confidence);
         return await Task.FromResult(result);
     }

@@ -1,27 +1,33 @@
 using System;
 using System.Threading.Tasks;
+using KKBOT.Domain.Enums;
 using KKBOT.Domain.Models;
 using KKBOT.Persistence.Abstractions;
 using KKBOT.Persistence.EfCore;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace KKBOT.Persistence.Tests;
+namespace KKBOT.Persistence.Tests
 {
     public class EfRepositoryTests
     {
+        private static SqliteConnection? _activeConnection;
+
         private static ServiceProvider CreateProvider()
         {
             var services = new ServiceCollection();
-            services.AddDbContext<KkbotDbContext>(options => options.UseSqlite("DataSource=:memory:"));
+            var connection = new SqliteConnection("DataSource=:memory:");
+            connection.Open();
+            _activeConnection = connection;
+            services.AddDbContext<KkbotDbContext>(options => options.UseSqlite(connection));
             services.AddScoped<IInstanceRepository, EfInstanceRepository>();
             services.AddScoped<IJobRepository, EfJobRepository>();
             var provider = services.BuildServiceProvider();
-            // Ensure database created
+            // Ensure database created on the shared, still-open connection
             using var scope = provider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<KkbotDbContext>();
-            db.Database.OpenConnection();
             db.Database.EnsureCreated();
             return provider;
         }
@@ -33,21 +39,26 @@ namespace KKBOT.Persistence.Tests;
             using var scope = provider.CreateScope();
             var repo = scope.ServiceProvider.GetRequiredService<IInstanceRepository>();
 
-            var instance = new Instance(Guid.NewGuid(), "Test Instance", InstanceStatus.Created, null);
+            var instance = new Instance
+            {
+                Key = "test-instance",
+                DisplayName = "Test Instance",
+                State = InstanceState.Created
+            };
             await repo.AddAsync(instance, CancellationToken.None);
 
             var fetched = await repo.GetAsync(instance.Id, CancellationToken.None);
             Assert.NotNull(fetched);
-            Assert.Equal("Test Instance", fetched!.Name);
+            Assert.Equal("Test Instance", fetched!.DisplayName);
 
-            instance = instance with { Name = "Updated" };
-            await repo.UpdateAsync(instance, CancellationToken.None);
-            fetched = await repo.GetAsync(instance.Id, CancellationToken.None);
-            Assert.Equal("Updated", fetched!.Name);
+            fetched.DisplayName = "Updated";
+            await repo.UpdateAsync(fetched, CancellationToken.None);
+            var updated = await repo.GetAsync(instance.Id, CancellationToken.None);
+            Assert.Equal("Updated", updated!.DisplayName);
 
             await repo.DeleteAsync(instance.Id, CancellationToken.None);
-            fetched = await repo.GetAsync(instance.Id, CancellationToken.None);
-            Assert.Null(fetched);
+            var deleted = await repo.GetAsync(instance.Id, CancellationToken.None);
+            Assert.Null(deleted);
         }
 
         [Fact]
@@ -56,22 +67,39 @@ namespace KKBOT.Persistence.Tests;
             var provider = CreateProvider();
             using var scope = provider.CreateScope();
             var repo = scope.ServiceProvider.GetRequiredService<IJobRepository>();
+            var db = scope.ServiceProvider.GetRequiredService<KkbotDbContext>();
 
-            var job = new Job(Guid.NewGuid(), Guid.NewGuid(), JobType.OneShot, JobStatus.Pending, "{}");
+            var module = new Module
+            {
+                Key = "test-module",
+                DisplayName = "Test Module",
+                Version = "1.0.0"
+            };
+            db.Modules.Add(module);
+            await db.SaveChangesAsync(CancellationToken.None);
+
+            var job = new Job
+            {
+                Key = "test-job",
+                DisplayName = "Test Job",
+                ModuleId = module.Id,
+                TaskId = "task-1",
+                Parameters = "{}"
+            };
             await repo.AddAsync(job, CancellationToken.None);
 
             var fetched = await repo.GetAsync(job.Id, CancellationToken.None);
             Assert.NotNull(fetched);
-            Assert.Equal(JobStatus.Pending, fetched!.Status);
+            Assert.Equal("Test Job", fetched!.DisplayName);
 
-            job = job with { Status = JobStatus.Running };
-            await repo.UpdateAsync(job, CancellationToken.None);
-            fetched = await repo.GetAsync(job.Id, CancellationToken.None);
-            Assert.Equal(JobStatus.Running, fetched!.Status);
+            fetched.DisplayName = "Updated";
+            await repo.UpdateAsync(fetched, CancellationToken.None);
+            var updated = await repo.GetAsync(job.Id, CancellationToken.None);
+            Assert.Equal("Updated", updated!.DisplayName);
 
             await repo.DeleteAsync(job.Id, CancellationToken.None);
-            fetched = await repo.GetAsync(job.Id, CancellationToken.None);
-            Assert.Null(fetched);
+            var deleted = await repo.GetAsync(job.Id, CancellationToken.None);
+            Assert.Null(deleted);
         }
     }
 }

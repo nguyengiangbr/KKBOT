@@ -64,7 +64,7 @@ public sealed record TenantSettings(
     bool EnableMarketplace = true,
     bool EnableAdvancedOrchestration = true,
     Dictionary<string, string> CustomSettings = default!,
-    AllowedIpRanges = default!
+    AllowedIpRanges AllowedIpRanges = default!
 );
 
 public sealed record TenantSubscription(

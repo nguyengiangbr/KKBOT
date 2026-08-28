@@ -17,4 +17,14 @@ public interface IMetricsRegistry
     /// Gets all current metric values.
     /// </summary>
     IReadOnlyDictionary<string, double> GetAllCurrentValues();
+
+    /// <summary>
+    /// Increments the total HTTP requests metric.
+    /// </summary>
+    void IncrementHttpRequests();
+
+    /// <summary>
+    /// Increments the failed HTTP requests metric.
+    /// </summary>
+    void IncrementHttpRequestsFailed();
 }

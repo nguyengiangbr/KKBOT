@@ -1,6 +1,7 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Collections.Generic;
 using KKBOT.Device.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,6 +20,27 @@ public class AdbClientOptions
     public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(10);
     public int MaxRetries { get; set; } = 3;
     public int RetryDelayMs { get; set; } = 500;
+
+    // Circuit breaker settings
+    public int CircuitBreakerThreshold { get; set; } = 5;
+    public TimeSpan CircuitBreakerDuration { get; set; } = TimeSpan.FromSeconds(30);
+
+    // Command-type specific timeouts (milliseconds)
+    public Dictionary<AdbCommandType, int> CommandTimeoutsMs { get; set; } = new()
+    {
+        [AdbCommandType.DeviceList] = 5000,
+        [AdbCommandType.DeviceState] = 5000,
+        [AdbCommandType.Screencap] = 10000,
+        [AdbCommandType.Shell] = 30000,
+        [AdbCommandType.Input] = 5000,
+        [AdbCommandType.Install] = 120000,
+        [AdbCommandType.Uninstall] = 30000,
+        [AdbCommandType.Forward] = 5000,
+        [AdbCommandType.Reverse] = 5000,
+        [AdbCommandType.Logcat] = 10000,
+        [AdbCommandType.Push] = 60000,
+        [AdbCommandType.Pull] = 60000
+    };
 }
 
 /// <summary>

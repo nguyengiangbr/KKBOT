@@ -90,6 +90,7 @@ public sealed class AspectSentiment
     public int Mentions { get; set; }
     public int PositiveMentions { get; set; }
     public int NegativeMentions { get; set; }
+    public double TotalScore { get; set; }
     public double SentimentScore => Mentions > 0 ? (double)(PositiveMentions - NegativeMentions) / Mentions : 0;
 }
 
@@ -168,7 +169,6 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
     private readonly ILogger<SentimentAnalysisService> _logger;
     private readonly MLContext _mlContext;
     private ITransformer? _sentimentModel;
-    private ITransformer? _aspectModel;
     private readonly string _modelPath;
 
     // Aspect keywords for rule-based fallback
@@ -624,21 +624,27 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
         return total > 0 ? (double)(positiveScore - negativeScore) / total : 0;
     }
 
+    private static DateTime GetWeekStart(DateTime date)
+    {
+        var diff = (int)date.DayOfWeek;
+        return date.Date.AddDays(-diff);
+    }
+
     private async Task<AspectSentiment[]> AnalyzeAspectsForPluginAsync(IEnumerable<string> contents, CancellationToken ct)
     {
-        var aspectData = new Dictionary<string, AspectSentimentData>();
+        var aspectData = new Dictionary<string, AspectSentiment>();
 
         foreach (var content in contents)
         {
             var lowerContent = content.ToLowerInvariant();
-            
+
             foreach (var (aspect, keywords) in AspectKeywords)
             {
                 var mentions = keywords.Count(k => lowerContent.Contains(k));
                 if (mentions > 0)
                 {
                     if (!aspectData.ContainsKey(aspect))
-                        aspectData[aspect] = new AspectSentimentData { Aspect = aspect };
+                        aspectData[aspect] = new AspectSentiment { Aspect = aspect };
 
                     var data = aspectData[aspect];
                     data.Mentions++;
@@ -692,7 +698,7 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
                 foreach (var content in contents)
                 {
                     var score = CalculateContextSentiment(content, AspectKeywords[aspect]);
-                    if (keywords.Any(k => content.ToLowerInvariant().Contains(k)))
+                    if (AspectKeywords[aspect].Any(k => content.ToLowerInvariant().Contains(k)))
                     {
                         mentions++;
                         totalScore += CalculateContextSentiment(content, AspectKeywords[aspect]);
@@ -749,28 +755,7 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
         return shifts.ToArray();
     }
 
-    private SentimentShift[] DetectSignificantShifts(List<SentimentTrendPoint> trends)
-    {
-        var shifts = new List<SentimentShift>();
-        const double threshold = 0.3;
 
-        for (int i = 1; i < trends.Count; i++)
-        {
-            var change = trends[i].AverageScore - trends[i - 1].AverageScore;
-            if (Math.Abs(change) >= threshold)
-            {
-                shifts.Add(new SentimentShift
-                {
-                    Date = trends[i].Date,
-                    ScoreChange = change,
-                    Trigger = change > 0 ? "positive_surge" : "negative_drop",
-                    Description = $"Sentiment shifted by {change:F2}"
-                });
-            }
-        }
-
-        return shifts.ToArray();
-    }
 
     private string[] ExtractKeyPhrases(string text)
     {
@@ -835,15 +820,6 @@ public sealed class SentimentAnalysisService : ISentimentAnalysisService
             .Select(g => g.Key)
             .ToArray();
     }
-}
-
-public sealed class AspectSentimentData
-{
-    public string Aspect { get; set; } = string.Empty;
-    public int Mentions { get; set; }
-    public int PositiveMentions { get; set; }
-    public int NegativeMentions { get; set; }
-    public double TotalScore { get; set; }
 }
 
 public sealed class ModelMetrics

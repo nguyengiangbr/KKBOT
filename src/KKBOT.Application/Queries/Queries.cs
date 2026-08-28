@@ -110,4 +110,4 @@ public record ValidateModuleQuery(Guid ModuleId) : IRequest<Domain.Common.Result
 /// <summary>
 /// Query to get health snapshots for an instance.
 /// </summary>
-public record GetHealthSnapshotsQuery(Guid InstanceId, int Limit = 10) : IRequest<IReadOnlyList<KkbOT.Contracts.Instances.HealthSnapshotDto>>;
+public record GetHealthSnapshotsQuery(Guid InstanceId, int Limit = 10) : IRequest<IReadOnlyList<KKBOT.Contracts.Instances.HealthSnapshotDto>>;

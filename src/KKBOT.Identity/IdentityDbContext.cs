@@ -1,8 +1,10 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using KKBOT.Identity;
 
 namespace KKBOT.Identity;
@@ -51,8 +53,16 @@ public sealed class IdentityDbContext : IdentityDbContext<ApplicationUser, Appli
             e.Property(t => t.DisplayName).HasMaxLength(200).IsRequired();
             e.Property(t => t.Domain).HasMaxLength(200);
             e.Property(t => t.LogoUrl).HasMaxLength(500);
-            e.Property(t => t.Settings).HasColumnType("TEXT");
-            e.Property(t => t.Subscription).HasColumnType("TEXT");
+            e.Property(t => t.Settings)
+                .HasColumnType("TEXT")
+                .HasConversion(new ValueConverter<TenantSettings, string>(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<TenantSettings>(v) ?? new()));
+            e.Property(t => t.Subscription)
+                .HasColumnType("TEXT")
+                .HasConversion(new ValueConverter<TenantSubscription, string>(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                    v => JsonSerializer.Deserialize<TenantSubscription>(v) ?? new()));
             e.HasIndex(t => t.Name).IsUnique();
             e.HasIndex(t => t.Domain).IsUnique();
         });

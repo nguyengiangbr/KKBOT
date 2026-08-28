@@ -33,6 +33,7 @@ public interface IMarketplaceService
     // Download Tracking
     Task RecordDownloadAsync(Guid pluginVersionId, string userId, string userAgent, string ipAddress, CancellationToken ct = default);
     Task<DownloadStats> GetDownloadStatsAsync(string pluginId, CancellationToken ct = default);
+    Task<string> GetDownloadUrlAsync(Guid pluginVersionId, CancellationToken ct = default);
 
     // Reviews
     Task<PluginReview> CreateReviewAsync(string pluginId, CreateReviewRequest request, string userId, CancellationToken ct = default);
@@ -51,7 +52,7 @@ public interface IMarketplaceService
     // Tags & Categories
     Task<IReadOnlyList<PluginTag>> GetPopularTagsAsync(int limit = 20, CancellationToken ct = default);
     Task<IReadOnlyList<PluginCategory>> GetCategoriesAsync(CancellationToken ct = default);
-    Task<IReadOnlyList<License>> GetLicensesAsync(Cancellation ct = default);
+    Task<IReadOnlyList<License>> GetLicensesAsync(CancellationToken ct = default);
 
     // Moderation
     Task<ModerationQueue> SubmitForModerationAsync(SubmitModerationRequest request, CancellationToken ct = default);
@@ -467,6 +468,19 @@ public sealed class MarketplaceService : IMarketplaceService
         };
     }
 
+    public async Task<string> GetDownloadUrlAsync(Guid pluginVersionId, CancellationToken ct = default)
+    {
+        var version = await _dbContext.PluginVersions
+            .Include(v => v.PluginPackage)
+            .FirstOrDefaultAsync(v => v.Id == pluginVersionId, ct);
+
+        if (version == null)
+            throw new InvalidOperationException("Plugin version not found");
+
+        var objectName = $"plugins/{version.PluginPackage.PluginId}/{version.Version}/package.dll";
+        return await _storage.GeneratePresignedUrlAsync(objectName, TimeSpan.FromMinutes(15), ct);
+    }
+
     public async Task<PluginReview> CreateReviewAsync(string pluginId, CreateReviewRequest request, string userId, CancellationToken ct = default)
     {
         var plugin = await _dbContext.PluginPackages.FirstOrDefaultAsync(p => p.PluginId == pluginId, ct);
@@ -727,8 +741,8 @@ public sealed class MarketplaceService : IMarketplaceService
         if (query.Status.HasValue)
             q = q.Where(m => m.Status == query.Status.Value);
 
-        if (query.EntityType.HasValue)
-            q = q.Where(m => m.EntityType == query.EntityType.Value.ToString());
+        if (!string.IsNullOrEmpty(query.EntityType))
+            q = q.Where(m => m.EntityType == query.EntityType);
 
         if (query.Priority.HasValue)
             q = q.Where(m => m.Priority == query.Priority.Value);
@@ -889,7 +903,8 @@ public sealed record PluginSearchQuery(
     string SortBy = "createdAt",
     bool SortDescending = true,
     int Page = 1,
-    int PageSize = 20
+    int PageSize = 20,
+    string[]? Tags = null
 );
 
 public sealed record VersionQuery(

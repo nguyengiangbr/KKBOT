@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 using KKBOT.Identity;
-using KKBOT.Identity.Models;
 using KKBOT.Identity.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,10 +31,16 @@ public class IdentityTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(config);
-        services.AddLogging(b => b.AddConsole());
+        services.AddLogging();
+
+        // In-memory SQLite database is tied to a single open connection.
+        // Share one open connection so the database persists across DbContexts.
+        var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        services.AddSingleton<DbConnection>(connection);
         
         services.AddDbContext<IdentityDbContext>(options => 
-            options.UseSqlite("DataSource=:memory:"));
+            options.UseSqlite(connection));
         
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
         {
@@ -53,7 +60,6 @@ public class IdentityTests
         // Ensure database created
         using var scope = provider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        db.Database.OpenConnection();
         db.Database.EnsureCreated();
         
         return provider;
@@ -352,10 +358,10 @@ public class PermissionTests
     {
         var viewerPerms = KKBOTPermissions.RolePermissions["Viewer"];
         
-        // All viewer permissions should end with .view or be view-related
+        // All viewer permissions should end with .view or be read/browse-related
         foreach (var perm in viewerPerms)
         {
-            Assert.True(perm.EndsWith(".view") || perm == "Logs_View" || perm == "Metrics_View" || perm == "Audit_View" || perm == "Settings_View");
+            Assert.True(perm.EndsWith(".view") || perm == "Logs_View" || perm == "Metrics_View" || perm == "Audit_View" || perm == "Settings_View" || perm == KKBOTPermissions.Marketplace_Browse);
         }
     }
 
@@ -364,11 +370,11 @@ public class PermissionTests
     {
         var operatorPerms = KKBOTPermissions.RolePermissions["Operator"];
         
-        Assert.Contains("Instances_Start", operatorPerms);
-        Assert.Contains("Instances_Stop", operatorPerms);
-        Assert.Contains("Jobs_Create", operatorPerms);
-        Assert.Contains("Jobs_Cancel", operatorPerms);
-        Assert.DoesNotContain("Instances_Delete", operatorPerms);
-        Assert.DoesNotContain("Users_Delete", operatorPerms);
+        Assert.Contains(KKBOTPermissions.Instances_Start, operatorPerms);
+        Assert.Contains(KKBOTPermissions.Instances_Stop, operatorPerms);
+        Assert.Contains(KKBOTPermissions.Jobs_Create, operatorPerms);
+        Assert.Contains(KKBOTPermissions.Jobs_Cancel, operatorPerms);
+        Assert.DoesNotContain(KKBOTPermissions.Instances_Delete, operatorPerms);
+        Assert.DoesNotContain(KKBOTPermissions.Users_Delete, operatorPerms);
     }
 }

@@ -6,8 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\KKBOT.Application\KKBOT.Application.csproj" />
-    <ProjectReference Include="..\..\KKBOT.Domain\KKBOT.Domain.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Application\KKBOT.Application.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Domain\KKBOT.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="xunit" />

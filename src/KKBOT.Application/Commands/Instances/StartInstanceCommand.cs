@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using KKBOT.Domain.Common;
+using FluentValidation;
 using MediatR;
 
 namespace KKBOT.Application.Commands.Instances;

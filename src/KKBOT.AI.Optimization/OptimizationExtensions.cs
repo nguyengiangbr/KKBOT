@@ -4,10 +4,14 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.ML;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using KKBOT.AI.Optimization.Services;
 using KKBOT.AI.Optimization.Abstractions;
+using KKBOT.AI.Optimization.Models;
 
-namespace KKBOT.AI.Optimization;
+namespace KKBOT.AI.Optimization
+{
 
 public static class OptimizationExtensions
 {
@@ -23,7 +27,7 @@ public static class OptimizationExtensions
         services.AddSingleton<IModelConverter, ModelConverter>();
         services.AddSingleton<IQuantizationService, QuantizationService>();
         services.AddSingleton<IModelBenchmarkService, BenchmarkService>();
-        services.AddSingleton<IOptimizationPipeline, OptimizationPipelineService>();
+        services.AddSingleton<IOptimizationPipelineService, OptimizationPipelineService>();
         services.AddSingleton<IModelOptimizer, ModelOptimizer>();
 
         // Deployment services
@@ -43,8 +47,11 @@ public static class OptimizationExtensions
     }
 }
 
+}
+
 // Pipeline service implementation
-namespace KKBOT.AI.Optimization.Services;
+namespace KKBOT.AI.Optimization.Services
+{
 
 public interface IOptimizationPipelineService
 {
@@ -72,14 +79,13 @@ public sealed class OptimizationPipelineService : IOptimizationPipelineService
         var config = new OptimizationConfig
         {
             OptimizationId = pipelineId,
-            ModelId = pipeline.GlobalOptions.GetValueOrDefault("modelId", "unknown"),
-            TargetPlatform = pipeline.GlobalOptions.GetValueOrDefault("targetPlatform", TargetPlatform.Cpu),
-            PrecisionMode = pipeline.GlobalOptions.GetValueOrDefault("precisionMode", PrecisionMode.Fp16),
+            ModelId = (string)pipeline.GlobalOptions.GetValueOrDefault("modelId", "unknown"),
+            TargetPlatform = (TargetPlatform)pipeline.GlobalOptions.GetValueOrDefault("targetPlatform", TargetPlatform.Cpu),
+            PrecisionMode = (PrecisionMode)pipeline.GlobalOptions.GetValueOrDefault("precisionMode", PrecisionMode.Fp16),
             EnabledStages = pipeline.Steps.Select(s => s.Stage).ToList(),
-            Quantization = pipeline.GlobalOptions.GetValueOrDefault("quantization", new QuantizationConfig()),
-            Calibration = pipeline.GlobalOptions.GetValueOrDefault("calibration", new CalibrationConfig()),
-            Benchmark = pipeline.GlobalOptions.GetValueOrDefault("benchmark", new BenchmarkConfig()),
-            EnabledStages = pipeline.Steps.Select(s => s.Stage).ToList()
+            Quantization = (QuantizationConfig)pipeline.GlobalOptions.GetValueOrDefault("quantization", new QuantizationConfig()),
+            Calibration = (CalibrationConfig)pipeline.GlobalOptions.GetValueOrDefault("calibration", new CalibrationConfig()),
+            Benchmark = (BenchmarkConfig)pipeline.GlobalOptions.GetValueOrDefault("benchmark", new BenchmarkConfig())
         };
 
         var result = await _optimizer.OptimizeAsync(config, CancellationToken.None);
@@ -104,4 +110,6 @@ public sealed class OptimizationOptions
     public double MaxLatencyIncreaseThreshold { get; set; } = 1.1;
     public string ModelsPath { get; set; } = "models";
     public string ArtifactsPath { get; set; } = "artifacts";
+}
+
 }

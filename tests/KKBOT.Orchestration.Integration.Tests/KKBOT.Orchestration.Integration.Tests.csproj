@@ -10,33 +10,33 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="xunit" Version="2.6.6" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="FluentAssertions" Version="6.12.0" />
-    <PackageReference Include="Moq" Version="4.20.70" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Polly" Version="8.0.0" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Polly" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="....srcKKBOT.DomainKKBOT.Domain.csproj" />
-    <ProjectReference Include="....srcKKBOT.OrchestrationKKBOT.Orchestration.csproj" />
-    <ProjectReference Include="....srcKKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.Plugins.LoaderKKBOT.Plugins.Loader.csproj" />
-    <ProjectReference Include="....srcKKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.Device.SimulatorKKBOT.Device.Simulator.csproj" />
-    <ProjectReference Include="....srcKKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.ObservabilityKKBOT.Observability.csproj" />
-    <ProjectReference Include="....srcKKBOT.Persistence.AbstractionsKKBOT.Persistence.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.Persistence.EfCoreKKBOT.Persistence.EfCore.csproj" />
-    <ProjectReference Include="....srcKKBOT.SecurityKKBOT.Security.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Domain\KKBOT.Domain.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Plugins.Loader\KKBOT.Plugins.Loader.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Device.Simulator\KKBOT.Device.Simulator.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Persistence.Abstractions\KKBOT.Persistence.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Persistence.EfCore\KKBOT.Persistence.EfCore.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Security\KKBOT.Security.csproj" />
   </ItemGroup>
 
 </Project>

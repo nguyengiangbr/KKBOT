@@ -15,14 +15,14 @@ public sealed class AdbScreenshotProvider : IAsyncDisposable
 {
     private readonly string _deviceId;
     private readonly AdbClientOptions _options;
-    private readonly ILogger<AdbScreenshotProvider> _logger;
+    private readonly ILogger _logger;
     private readonly AdbCommandRunner _commandRunner;
     private bool _disposed;
 
     public AdbScreenshotProvider(
         string deviceId,
         AdbClientOptions options,
-        ILogger<AdbScreenshotProvider> logger,
+        ILogger logger,
         AdbCommandRunner commandRunner)
     {
         _deviceId = deviceId;
@@ -77,9 +77,9 @@ public sealed class AdbScreenshotProvider : IAsyncDisposable
             };
 
             // Apply ROI if specified
-            if (options.RegionOfInterest.HasValue)
+            if (options.RegionOfInterest != null)
             {
-                frame = ApplyRoi(frame, options.RegionOfInterest.Value);
+                frame = ApplyRoi(frame, options.RegionOfInterest);
             }
 
             _logger.LogDebug("Captured frame {FrameId} from {DeviceId}: {Width}x{Height} in {Latency}ms",

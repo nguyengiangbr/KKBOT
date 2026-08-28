@@ -10,28 +10,28 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="xunit" Version="2.6.6" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="FluentAssertions" Version="6.12.0" />
-    <PackageReference Include="Moq" Version="4.20.70" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="....srcKKBOT.Plugin.NetworkProxyKKBOT.Plugin.NetworkProxy.csproj" />
-    <ProjectReference Include="....srcKKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="....srcKKBOT.OrchestrationKKBOT.Orchestration.csproj" />
-    <ProjectReference Include="....srcKKBOT.Agent.CoordinationKKBOT.Agent.Coordination.csproj" />
-    <ProjectReference Include="....srcKKBOT.ObservabilityKKBOT.Observability.csproj" />
-    <ProjectReference Include="....srcKKBOT.Agent.Coordination.AbstractionsKKBOT.Agent.Coordination.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Plugin.NetworkProxy\KKBOT.Plugin.NetworkProxy.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Orchestration\KKBOT.Orchestration.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Agent.Coordination\KKBOT.Agent.Coordination.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Observability\KKBOT.Observability.csproj" />
+    <ProjectReference Include="..\..\src\KKBOT.Agent.Coordination.Abstractions\KKBOT.Agent.Coordination.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

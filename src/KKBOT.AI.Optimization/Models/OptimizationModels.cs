@@ -91,6 +91,8 @@ public sealed class ModelSpec
     public Dictionary<string, object> Metadata { get; set; } = new();
     public long FileSizeBytes { get; set; }
     public string Checksum { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>

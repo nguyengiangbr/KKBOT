@@ -205,7 +205,7 @@ public sealed class MarketplaceController : ControllerBase
         [FromQuery] string? keyword,
         [FromQuery] Guid? categoryId,
         [FromQuery] bool verifiedOnly = false,
-        [FromQuery] int? licenseId,
+        [FromQuery] int? licenseId = null,
         [FromQuery] string sortBy = "downloads",
         [FromQuery] bool sortDescending = true,
         [FromQuery] int page = 1,

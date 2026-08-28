@@ -1,6 +1,7 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using KKBOT.Observability.Metrics;
 using System.Diagnostics;
 
 namespace KKBOT.Observability;
@@ -35,21 +37,6 @@ public sealed class OpenTelemetryOptions
     public string Environment { get; set; } = "development";
 
     /// <summary>
-    /// Enable Jaeger exporter.
-    /// </summary>
-    public bool EnableJaeger { get; set; } = true;
-
-    /// <summary>
-    /// Jaeger agent host.
-    /// </summary>
-    public string JaegerHost { get; set; } = "localhost";
-
-    /// <summary>
-    /// Jaeger agent port.
-    /// </summary>
-    public int JaegerPort { get; set; } = 6831;
-
-    /// <summary>
     /// Enable OTLP exporter (for Tempo, Grafana Cloud, etc.).
     /// </summary>
     public bool EnableOtlp { get; set; } = false;
@@ -58,16 +45,6 @@ public sealed class OpenTelemetryOptions
     /// OTLP endpoint (e.g., http://tempo:4317).
     /// </summary>
     public string OtlpEndpoint { get; set; } = "http://localhost:4317";
-
-    /// <summary>
-    /// Enable Prometheus metrics exporter.
-    /// </summary>
-    public bool EnablePrometheus { get; set; } = true;
-
-    /// <summary>
-    /// Prometheus scrape endpoint port.
-    /// </summary>
-    public int PrometheusPort { get; set; } = 9464;
 
     /// <summary>
     /// Enable console exporter for development.
@@ -107,13 +84,14 @@ public static class OpenTelemetryExtensions
         services.AddSingleton(options);
 
         // Configure OpenTelemetry SDK
-        var builder = services.AddOpenTelemetry();
+        var resourceAttributes = CreateResourceAttributes(options);
+        var builder = services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddAttributes(resourceAttributes));
 
         // ===== TRACING =====
         builder.WithTracing(tracerProviderBuilder =>
         {
             tracerProviderBuilder
-                .SetResourceBuilder(CreateResourceBuilder(options))
                 .AddSource("KKBOT.*")
                 .AddSource("KKBOT.Device.*")
                 .AddSource("KKBOT.Perception.*")
@@ -157,27 +135,9 @@ public static class OpenTelemetryExtensions
                         activity.SetTag("db.operation", command.CommandText?.Split(' ')[0] ?? "");
                     };
                 })
-                .AddRuntimeInstrumentation()
                 .SetSampler(new TraceIdRatioBasedSampler(options.SamplingRatio));
 
             // Exporters
-            if (options.EnableJaeger)
-            {
-                tracerProviderBuilder.AddJaegerExporter(jaegerOptions =>
-                {
-                    jaegerOptions.AgentHost = options.JaegerHost;
-                    jaegerOptions.AgentPort = options.JaegerPort;
-                    jaegerOptions.ExportProcessorType = ExportProcessorType.Batch;
-                    jaegerOptions.BatchExportProcessorOptions = new BatchExportProcessorOptions<Activity>
-                    {
-                        MaxQueueSize = 2048,
-                        ScheduledDelayMilliseconds = 5000,
-                        ExporterTimeoutMilliseconds = 30000,
-                        MaxExportBatchSize = 512
-                    };
-                });
-            }
-
             if (options.EnableOtlp)
             {
                 tracerProviderBuilder.AddOtlpExporter(otlpOptions =>
@@ -198,7 +158,6 @@ public static class OpenTelemetryExtensions
         builder.WithMetrics(metricsProviderBuilder =>
         {
             metricsProviderBuilder
-                .SetResourceBuilder(CreateResourceBuilder(options))
                 .AddMeter("KKBOT.*")
                 .AddMeter("KKBOT.Device")
                 .AddMeter("KKBOT.Perception")
@@ -208,12 +167,7 @@ public static class OpenTelemetryExtensions
                 .AddMeter("KKBOT.Workflow")
                 .AddRuntimeInstrumentation()
                 .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddPrometheusExporter(prometheusOptions =>
-                {
-                    prometheusOptions.ScrapeEndpointPath = "/metrics";
-                    prometheusOptions.StartHttpListener = options.EnablePrometheus;
-                });
+                .AddHttpClientInstrumentation();
 
             if (options.EnableConsoleExporter)
             {
@@ -235,7 +189,6 @@ public static class OpenTelemetryExtensions
         {
             loggingBuilder.AddOpenTelemetry(loggingOptions =>
             {
-                loggingOptions.SetResourceBuilder(CreateResourceBuilder(options));
                 loggingOptions.AddConsoleExporter();
                 
                 if (options.EnableOtlp)
@@ -263,7 +216,7 @@ public static class OpenTelemetryExtensions
     /// <summary>
     /// Creates a resource builder with standard attributes.
     /// </summary>
-    private static ResourceBuilder CreateResourceBuilder(OpenTelemetryOptions options)
+    private static Dictionary<string, object> CreateResourceAttributes(OpenTelemetryOptions options)
     {
         var attributes = new Dictionary<string, object>
         {
@@ -278,7 +231,7 @@ public static class OpenTelemetryExtensions
             attributes[kvp.Key] = kvp.Value;
         }
 
-        return ResourceBuilder.CreateDefault().AddAttributes(attributes);
+        return attributes;
     }
 
     /// <summary>
@@ -364,7 +317,7 @@ public static class ActivityExtensions
 
         // Add correlation ID from current context if available
         var correlationId = Activity.Current?.GetTagItem(KkbotTags.CorrelationId)?.ToString();
-        if (!string.IsEmpty(correlationId))
+        if (!string.IsNullOrEmpty(correlationId))
         {
             activity.SetTag(KkbotTags.CorrelationId, correlationId);
         }

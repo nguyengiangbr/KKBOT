@@ -11,6 +11,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using KKBOT.Identity;
 using KKBOT.Identity.Authorization;
+using KKBOT.Orchestration;
+using KKBOT.Orchestration.MultiTenancy;
 using KKBOT.Identity.Middleware;
 using KKBOT.Identity.Services;
 
@@ -118,7 +120,7 @@ public static class IdentityExtensions
         });
 
         // Authorization: Register PermissionAuthorizationHandler and policies
-        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<IAuthorizationHandler, KKBOT.Identity.Authorization.PermissionAuthorizationHandler>();
         services.AddAuthorization(options =>
         {
             // Register all KKBOT permission policies using the extension
@@ -179,7 +181,7 @@ public sealed class EFTenantProvider : ITenantProvider
         {
             TenantId = tenant.Id.ToString(),
             TenantName = tenant.DisplayName,
-            Settings = tenant.Settings
+            Settings = ToOrchestrationSettings(tenant.Settings)
         };
     }
 
@@ -190,11 +192,18 @@ public sealed class EFTenantProvider : ITenantProvider
         {
             TenantId = t.Id.ToString(),
             TenantName = t.DisplayName,
-            Settings = t.Settings
+            Settings = ToOrchestrationSettings(t.Settings)
         }).ToList();
     }
 
-    public Task<TenantContext> CreateTenantAsync(string tenantId, string tenantName, TenantSettings? settings = null, CancellationToken ct = default)
+    private static KKBOT.Orchestration.MultiTenancy.TenantSettings ToOrchestrationSettings(KKBOT.Identity.TenantSettings s) => new(
+        MaxInstances: s.MaxInstances,
+        MaxConcurrentJobs: s.MaxConcurrentJobs,
+        EnableAi: s.EnableAi,
+        EnablePlugins: s.EnablePlugins,
+        Features: s.CustomSettings);
+
+    public Task<TenantContext> CreateTenantAsync(string tenantId, string tenantName, KKBOT.Orchestration.MultiTenancy.TenantSettings? settings = null, CancellationToken ct = default)
     {
         throw new NotImplementedException("Use IdentityService.CreateTenantAsync");
     }

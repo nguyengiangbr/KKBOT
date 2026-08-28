@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using KKBOT.Observability.Metrics;
 using KKBOT.Orchestration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Xunit;
 
-namespace KKBOT.Orchestration.Tests;
+namespace KKBOT.Orchestration.Tests
 {
     public class DagSchedulerTests
     {
@@ -20,7 +22,7 @@ namespace KKBOT.Orchestration.Tests;
             var jobs = new List<DagJob> { jobA, jobB, jobC };
 
             var executed = new List<Guid>();
-            var scheduler = new DagScheduler(NullLogger<DagScheduler>.Instance, new EventStore());
+            var scheduler = new DagScheduler(NullLogger<DagScheduler>.Instance, new EventStore(NullLogger<EventStore>.Instance, Options.Create(new EventStoreOptions()), new MetricsRegistry()));
 
             // Act
             await scheduler.RunAsync(jobs, async (job, ct) =>

@@ -115,11 +115,28 @@ public sealed class CollaborationHub : Hub, ICollaborationHub
         await base.OnDisconnectedAsync(exception);
     }
 
+    // ICollaborationHub implementation
+    public Task BroadcastToSessionAsync(Guid sessionId, string method, object payload, CancellationToken ct = default)
+        => Clients.Group($"session:{sessionId}").SendAsync(method, payload, ct);
+
+    public Task SendToUserAsync(string userId, string method, object payload, CancellationToken ct = default)
+        => Clients.User(userId).SendAsync(method, payload, ct);
+
+    public Task SendToConnectionAsync(string connectionId, string method, object payload, CancellationToken ct = default)
+        => Clients.Client(connectionId).SendAsync(method, payload, ct);
+
+    public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken ct = default)
+        => Groups.AddToGroupAsync(connectionId, groupName, ct);
+
+    public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken ct = default)
+        => Groups.RemoveFromGroupAsync(connectionId, groupName, ct);
+
     // Session management
     public async Task JoinSessionAsync(string connectionId, Guid sessionId, string userId, CancellationToken ct = default)
     {
         var participant = await _participantService.JoinSessionAsync(sessionId, new JoinSessionRequest
         {
+            UserId = userId,
             UserName = Context.User?.FindFirst("name")?.Value ?? userId,
             UserAvatar = Context.User?.FindFirst("picture")?.Value ?? ""
         }, ct);
@@ -306,7 +323,7 @@ public sealed class CollaborationHub : Hub, ICollaborationHub
     public async Task AddReaction(Guid messageId, string emoji, CancellationToken ct = default)
     {
         var userId = Context.User?.FindFirst("sub")?.Value ?? Context.ConnectionId;
-        var message = await _chatService.AddReactionAsync(messageId, request.Emoji, userId, CancellationToken.None);
+        var message = await _chatService.AddReactionAsync(messageId, emoji, userId, CancellationToken.None);
         
         await Clients.Group($"session:{GetSessionId()}").SendAsync("ReactionAdded", new
         {
@@ -449,11 +466,14 @@ public sealed class CollaborationHub : Hub, ICollaborationHub
     {
         // In a real implementation, this would come from the connection context or query string
         // For now, we'll get it from the connection's session mapping
-        if (_sessionConnections.TryGetValue(Context.ConnectionId, out var sessionId))
+        foreach (var kvp in _sessionConnections)
         {
-            return sessionId;
+            if (kvp.Value.Contains(Context.ConnectionId))
+            {
+                return kvp.Key;
+            }
         }
-        
+
         // Fallback: get from query string or context
         return Guid.TryParse(Context.GetHttpContext()?.Request.Query["sessionId"], out var sid) ? sid : Guid.Empty;
     }

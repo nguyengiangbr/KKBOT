@@ -13,7 +13,7 @@ namespace KKBOT.Device.Simulator;
 /// </summary>
 public sealed class ScenarioParser
 {
-    private readonly ILogger<ScenarioParser> _logger;
+    private readonly ILogger _logger;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -22,7 +22,7 @@ public sealed class ScenarioParser
         AllowTrailingCommas = true
     };
 
-    public ScenarioParser(ILogger<ScenarioParser> logger)
+    public ScenarioParser(ILogger logger)
     {
         _logger = logger;
     }

@@ -14,6 +14,22 @@ using CsvHelper.Configuration;
 
 namespace KKBOT.Marketplace.Server.Services;
 
+public interface IAnalyticsService
+{
+    Task<MarketplaceOverview> GetOverviewAsync(CancellationToken ct = default);
+    Task<MarketplaceTrends> GetTrendsAsync(TrendPeriod period = TrendPeriod.Last30Days, CancellationToken ct = default);
+    Task<PluginAnalytics> GetPluginAnalyticsAsync(string pluginId, CancellationToken ct = default);
+    Task<PublisherAnalytics> GetPublisherAnalyticsAsync(Guid publisherId, CancellationToken ct = default);
+    Task<UserBehaviorMetrics> GetUserBehaviorMetricsAsync(CancellationToken ct = default);
+    Task<SearchAnalytics> GetSearchAnalyticsAsync(CancellationToken ct = default);
+    Task<RevenueAnalytics> GetRevenueAnalyticsAsync(CancellationToken ct = default);
+    Task<PayoutAnalytics> GetPayoutAnalyticsAsync(Guid publisherId, CancellationToken ct = default);
+    Task<PlatformHealthMetrics> GetPlatformHealthMetricsAsync(CancellationToken ct = default);
+    Task<ModerationAnalytics> GetModerationAnalyticsAsync(CancellationToken ct = default);
+    Task<RealTimeMetrics> GetRealTimeMetricsAsync(CancellationToken ct = default);
+    Task<byte[]> ExportAnalyticsReportAsync(ReportType type, ReportFormat format, DateTime from, DateTime to, CancellationToken ct = default);
+}
+
 public sealed class AnalyticsService : IAnalyticsService
 {
     private readonly MarketplaceDbContext _dbContext;
@@ -35,14 +51,14 @@ public sealed class AnalyticsService : IAnalyticsService
         var totalPublishers = await _dbContext.Publishers.CountAsync(ct);
         var verifiedPublishers = await _dbContext.Publishers.CountAsync(p => p.VerificationStatus == "verified", ct);
         
-        var totalDownloads = await _dbContext.PluginPackages.SumAsync(p => (long?)p.DownloadCount ?? 0, ct) ?? 0;
+        var totalDownloads = await _dbContext.PluginPackages.SumAsync(p => (long?)p.DownloadCount ?? 0, ct);
         var monthlyDownloads = await _dbContext.PluginDownloads
             .Where(d => d.DownloadedAt >= monthAgo)
             .CountAsync(ct);
 
         var avgRating = await _dbContext.PluginPackages
             .Where(p => p.ReviewCount > 0)
-            .AverageAsync(p => (double?)p.AverageRating ?? 0, ct) ?? 0;
+            .AverageAsync(p => (double?)p.AverageRating, ct) ?? 0;
 
         var totalReviews = await _dbContext.PluginReviews.CountAsync(ct);
         var pendingModeration = await _dbContext.ModerationQueue.CountAsync(m => m.Status == ModerationStatus.Pending, ct);
@@ -137,7 +153,6 @@ public sealed class AnalyticsService : IAnalyticsService
         var plugin = await _dbContext.PluginPackages
             .Include(p => p.Versions)
             .Include(p => p.Reviews)
-            .Include(p => p.Downloads)
             .FirstOrDefaultAsync(p => p.PluginId == pluginId, ct);
 
         if (plugin == null)
@@ -195,8 +210,8 @@ public sealed class AnalyticsService : IAnalyticsService
             PluginId = plugin.PluginId,
             PluginName = plugin.Name,
             TotalDownloads = plugin.DownloadCount,
-            MonthlyDownloads = plugin.Downloads.Count(d => d.DownloadedAt >= DateTime.UtcNow.AddMonths(-1)),
-            WeeklyDownloads = plugin.Downloads.Count(d => d.DownloadedAt >= DateTime.UtcNow.AddDays(-7)),
+            MonthlyDownloads = await _dbContext.PluginDownloads.CountAsync(d => d.PluginVersion != null && d.PluginVersion.PluginPackageId == plugin.Id && d.DownloadedAt >= DateTime.UtcNow.AddMonths(-1), ct),
+            WeeklyDownloads = await _dbContext.PluginDownloads.CountAsync(d => d.PluginVersion != null && d.PluginVersion.PluginPackageId == plugin.Id && d.DownloadedAt >= DateTime.UtcNow.AddDays(-7), ct),
             AverageRating = plugin.AverageRating,
             ReviewCount = plugin.ReviewCount,
             RatingDistribution = new RatingDistribution
@@ -244,7 +259,7 @@ public sealed class AnalyticsService : IAnalyticsService
                 .ToDictionaryAsync(x => x.Country, x => (long)x.Count, CancellationToken.None),
             RetentionRate = await CalculateRetentionRateAsync(plugin.Id, ct),
             ChurnRate = await CalculateChurnRateAsync(plugin.Id, ct),
-            AverageTimeToFirstDownload = CalculateAverageTimeToFirstDownload(plugin)
+            AverageTimeToFirstDownload = CalculateAverageTimeToFirstDownload(plugin).TotalSeconds
         };
     }
 
@@ -262,8 +277,7 @@ public sealed class AnalyticsService : IAnalyticsService
         var pluginIds = publisher.Packages.Select(p => p.Id).ToList();
         var totalDownloads = publisher.Packages.Sum(p => p.DownloadCount);
         var monthlyDownloads = await _dbContext.PluginDownloads
-            .Where(d => d.PluginVersion.PluginPackageId != null && 
-                       pluginIds.Contains(d.PluginVersion.PluginPackageId.Value) &&
+            .Where(d => pluginIds.Contains(d.PluginVersion.PluginPackageId) &&
                        d.DownloadedAt >= DateTime.UtcNow.AddMonths(-1))
             .CountAsync(ct);
 
@@ -311,7 +325,7 @@ public sealed class AnalyticsService : IAnalyticsService
                 ct,
                 p => p.NetAmount),
             DownloadTrends = await GetDailyTrendAsync(
-                _dbContext.PluginDownloads.Where(d => d.PluginVersion.PluginPackageId != null && pluginIds.Contains(d.PluginVersion.PluginPackageId.Value)),
+                _dbContext.PluginDownloads.Where(d => pluginIds.Contains(d.PluginVersion.PluginPackageId)),
                 d => d.DownloadedAt,
                 TimeSpan.FromDays(1),
                 DateTime.UtcNow.AddMonths(-1),
@@ -442,9 +456,9 @@ public sealed class AnalyticsService : IAnalyticsService
             PendingAmount = payouts.Where(p => p.Status == PayoutStatus.Pending || p.Status == PayoutStatus.Processing).Sum(p => p.NetAmount),
             CompletedPayouts = payouts.Count(p => p.Status == PayoutStatus.Completed),
             FailedPayouts = payouts.Count(p => p.Status == PayoutStatus.Failed),
-            AveragePayoutAmount = completed.Any() ? completed.Average(p => p.NetAmount) : 0,
-            AveragePayoutTime = completed.Any() 
-                ? TimeSpan.FromTicks((long)completed.Average(p => (p.PaidAt.Value - p.CreatedAt).Ticks)) 
+            AveragePayoutAmount = completed.Any() ? (double)completed.Average(p => p.NetAmount) : 0,
+            AveragePayoutTime = completed.Any()
+                ? TimeSpan.FromTicks((long)completed.Average(p => (p.PaidAt!.Value - p.CreatedAt).Ticks))
                 : TimeSpan.Zero,
             PayoutTrends = payouts
                 .GroupBy(p => p.CreatedAt.Date)
@@ -494,7 +508,7 @@ public sealed class AnalyticsService : IAnalyticsService
         var today = DateTime.UtcNow.Date;
         var queue = await _dbContext.ModerationQueue.ToListAsync(ct);
 
-        var moderatorPerformance = await _dbContext.ModerationQueue
+        var moderatorPerformance = queue
             .Where(m => m.ModeratorId != null && m.ResolvedAt != null)
             .GroupBy(m => m.ModeratorId)
             .Select(g => new ModeratorPerformance
@@ -504,10 +518,10 @@ public sealed class AnalyticsService : IAnalyticsService
                 ItemsReviewed = g.Count(),
                 Approved = g.Count(m => m.Status == ModerationStatus.Approved),
                 Rejected = g.Count(m => m.Status == ModerationStatus.Rejected),
-                AverageReviewTime = TimeSpan.FromTicks((long)g.Average(m => (m.ResolvedAt.Value - m.SubmittedAt).Ticks)),
+                AverageReviewTime = TimeSpan.FromTicks((long)g.Average(m => (m.ResolvedAt!.Value - m.SubmittedAt).Ticks)),
                 AccuracyScore = 0.95 // Would calculate from audit
             })
-            .ToListAsync(ct);
+            .ToList();
 
         return new ModerationAnalytics
         {
@@ -517,7 +531,9 @@ public sealed class AnalyticsService : IAnalyticsService
             ApprovedToday = queue.Count(m => m.Status == ModerationStatus.Approved && m.ResolvedAt?.Date == DateTime.UtcNow.Date),
             RejectedToday = queue.Count(m => m.Status == ModerationStatus.Rejected && m.ResolvedAt?.Date == DateTime.UtcNow.Date),
             Escalated = queue.Count(m => m.Status == ModerationStatus.Escalated),
-            AverageReviewTime = TimeSpan.FromTicks((long)queue.Where(m => m.ResolvedAt != null).Average(m => (m.ResolvedAt.Value - m.SubmittedAt).Ticks)),
+            AverageReviewTime = queue.Where(m => m.ResolvedAt != null).Any()
+                ? TimeSpan.FromTicks((long)queue.Where(m => m.ResolvedAt != null).Average(m => (m.ResolvedAt!.Value - m.SubmittedAt).Ticks))
+                : TimeSpan.Zero,
             ApprovalRate = queue.Where(m => m.Status == ModerationStatus.Approved || m.Status == ModerationStatus.Rejected).Any() 
                 ? (double)queue.Count(m => m.Status == ModerationStatus.Approved) / queue.Count(m => m.Status == ModerationStatus.Approved || m.Status == ModerationStatus.Rejected) 
                 : 0,
@@ -554,7 +570,7 @@ public sealed class AnalyticsService : IAnalyticsService
 
     public async Task<byte[]> ExportAnalyticsReportAsync(ReportType type, ReportFormat format, DateTime from, DateTime to, CancellationToken ct = default)
     {
-        var data = await GetReportDataAsync(type, from, to, ct);
+        var data = GetReportDataAsync(type, from, to, ct);
 
         return format switch
         {
@@ -636,20 +652,25 @@ public sealed class AnalyticsService : IAnalyticsService
         TimeSpan interval,
         DateTime fromDate,
         CancellationToken ct,
-        System.Linq.Expressions.Expression<Func<T, double>>? valueSelector = null)
+        System.Linq.Expressions.Expression<Func<T, decimal>>? valueSelector = null)
     {
-        // For simplicity, group by date
-        var grouped = await query
+        var dateFunc = dateSelector.Compile();
+        var valueFunc = valueSelector?.Compile();
+
+        var items = await query
             .Where(BuildDateFilter(dateSelector, fromDate))
-            .GroupBy(dateSelector)
+            .ToListAsync(CancellationToken.None);
+
+        var grouped = items
+            .GroupBy(x => dateFunc(x).Date)
             .Select(g => new
             {
-                Date = g.Key.Date,
+                Date = g.Key,
                 Count = g.Count(),
-                Sum = valueSelector != null ? g.Sum(valueSelector) : 0.0
+                Sum = valueFunc != null ? g.Sum(valueFunc) : 0m
             })
             .OrderBy(x => x.Date)
-            .ToListAsync(CancellationToken.None);
+            .ToList();
 
         var result = new List<TrendDataPoint>();
         var current = fromDate.Date;
@@ -658,11 +679,12 @@ public sealed class AnalyticsService : IAnalyticsService
         while (current <= endDate)
         {
             var dayData = grouped.FirstOrDefault(g => g.Date == current);
+            var value = valueFunc != null ? (double)(dayData?.Sum ?? 0m) : (dayData?.Count ?? 0);
             result.Add(new TrendDataPoint
             {
                 Date = current,
-                Value = valueSelector != null ? dayData?.Sum ?? 0 : dayData?.Count ?? 0,
-                Label = (valueSelector != null ? dayData?.Sum ?? 0 : dayData?.Count ?? 0).ToString()
+                Value = value,
+                Label = value.ToString()
             });
             current = current.AddDays(1);
         }

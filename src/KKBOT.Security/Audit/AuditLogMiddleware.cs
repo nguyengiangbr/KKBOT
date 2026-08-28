@@ -77,22 +77,22 @@ public sealed class AuditLogMiddleware
         string body = string.Empty;
         if (request.ContentLength > 0 && request.Body.CanSeek)
         {
-            request.Body.Position = 0;
-            using var reader = new StreamReader(request.Body, leaveOpen: true);
-            var body = await reader.ReadToEndAsync();
-            request.Body.Position = 0;
+                request.Body.Position = 0;
+                using var reader = new StreamReader(request.Body, leaveOpen: true);
+                body = await reader.ReadToEndAsync();
+                request.Body.Position = 0;
         }
 
         return new AuditRequestInfo
         {
-            Method = context.Request.Method,
-            Path = context.Request.Path.Value,
-            QueryString = context.Request.QueryString.Value,
-            Headers = context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString()),
-            Body = context.Request.Body.CanSeek ? await ReadBodyAsync(context.Request.Body) : string.Empty,
-            ContentType = context.Request.ContentType,
-            ContentLength = context.Request.ContentLength
-        };
+                Method = context.Request.Method,
+                Path = context.Request.Path.Value ?? string.Empty,
+                QueryString = context.Request.QueryString.Value ?? string.Empty,
+                Headers = context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString()),
+                Body = context.Request.Body.CanSeek ? await ReadBodyAsync(context.Request.Body) : string.Empty,
+                ContentType = context.Request.ContentType ?? string.Empty,
+                ContentLength = context.Request.ContentLength
+            };
     }
 
     private async Task<string> ReadBodyAsync(Stream stream)
@@ -110,29 +110,29 @@ public sealed class AuditLogMiddleware
         {
             Timestamp = DateTimeOffset.UtcNow,
             CorrelationId = context.TraceIdentifier,
-            UserId = context.User?.FindFirst("sub")?.Value ?? context.User?.FindFirst("user_id")?.Value,
-            IpAddress = context.Connection.RemoteIpAddress?.ToString(),
+            UserId = context.User?.FindFirst("sub")?.Value ?? context.User?.FindFirst("user_id")?.Value ?? string.Empty,
+            IpAddress = context.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
             UserAgent = context.Request.Headers.UserAgent.ToString(),
             Method = context.Request.Method,
-            Path = context.Request.Path.Value,
-            QueryString = context.Request.QueryString.Value,
+            Path = context.Request.Path.Value ?? string.Empty,
+            QueryString = context.Request.QueryString.Value ?? string.Empty,
             StatusCode = context.Response.StatusCode,
             DurationMs = (long)duration.TotalMilliseconds,
             Success = success,
-            ErrorMessage = exception?.Message,
-            ErrorType = exception?.GetType().Name,
+            ErrorMessage = exception?.Message ?? string.Empty,
+            ErrorType = exception?.GetType().Name ?? string.Empty,
             Request = new AuditRequestInfo
             {
                 Method = context.Request.Method,
-                Path = context.Request.Path.Value,
-                QueryString = context.Request.QueryString.Value,
-                ContentType = context.Request.ContentType,
+                Path = context.Request.Path.Value ?? string.Empty,
+                QueryString = context.Request.QueryString.Value ?? string.Empty,
+                ContentType = context.Request.ContentType ?? string.Empty,
                 ContentLength = context.Request.ContentLength
             },
             Response = new AuditResponseInfo
             {
                 StatusCode = context.Response.StatusCode,
-                ContentType = context.Response.ContentType
+                ContentType = context.Response.ContentType ?? string.Empty
             }
         };
 

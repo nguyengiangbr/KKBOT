@@ -209,7 +209,7 @@ public sealed class CallStep : ScenarioStep
 /// </summary>
 public sealed class SetVariableStep : ScenarioStep
 {
-    public string Name { get; set; } = string.Empty;
+    public new string Name { get; set; } = string.Empty;
     public object? Value { get; set; }
     public string? Expression { get; set; } // CEL expression to evaluate
 }

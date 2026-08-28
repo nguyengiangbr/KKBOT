@@ -88,28 +88,31 @@ public sealed class OllamaVisionService : IAiVisionService
             var line = await reader.ReadLineAsync();
             if (string.IsNullOrWhiteSpace(line)) continue;
 
+            OllamaStreamResponse? streamResponse;
             try
             {
-                var streamResponse = JsonSerializer.Deserialize<OllamaStreamResponse>(line, _jsonOptions);
-                if (streamResponse == null) continue;
-
-                if (!string.IsNullOrEmpty(streamResponse.Response))
-                {
-                    fullContent = (fullContent ?? "") + streamResponse.Response;
-                    yield return new AiStreamChunk(streamResponse.Response, false);
-                }
-
-                if (streamResponse.Done)
-                {
-                    finalUsage = new AiUsage(streamResponse.EvalCount + streamResponse.PromptEvalCount, (int)streamResponse.TotalDuration);
-                    finishReason = "stop";
-                    yield return AiStreamChunk.Final(fullContent ?? "", finalUsage, finishReason);
-                    break;
-                }
+                streamResponse = JsonSerializer.Deserialize<OllamaStreamResponse>(line, _jsonOptions);
             }
             catch (JsonException ex)
             {
                 _logger.LogWarning(ex, "Failed to parse Ollama vision stream response: {Line}", line);
+                continue;
+            }
+
+            if (streamResponse == null) continue;
+
+            if (!string.IsNullOrEmpty(streamResponse.Response))
+            {
+                fullContent = (fullContent ?? "") + streamResponse.Response;
+                yield return new AiStreamChunk(streamResponse.Response, false);
+            }
+
+            if (streamResponse.Done)
+            {
+                finalUsage = new AiUsage(streamResponse.EvalCount + streamResponse.PromptEvalCount, (int)streamResponse.TotalDuration);
+                finishReason = "stop";
+                yield return AiStreamChunk.Final(fullContent ?? "", finalUsage, finishReason);
+                break;
             }
         }
     }
@@ -125,17 +128,4 @@ internal sealed class OllamaVisionRequest
     public string ImageBase64 { get; set; } = string.Empty;
     public OllamaRequestParameters Options { get; set; } = new();
     public bool Stream { get; set; } = false;
-}
-
-/// <summary>
-/// Streaming response from Ollama API.
-/// </summary>
-internal sealed class OllamaStreamResponse
-{
-    public string Model { get; set; } = string.Empty;
-    public string Response { get; set; } = string.Empty;
-    public bool Done { get; set; }
-    public int EvalCount { get; set; }
-    public int PromptEvalCount { get; set; }
-    public long TotalDuration { get; set; }
 }

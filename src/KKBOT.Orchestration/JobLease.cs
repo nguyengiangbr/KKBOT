@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -67,7 +69,7 @@ public sealed class JobLeaseManager : IDisposable
         if (added)
         {
             _logger.LogDebug("Worker {WorkerId} acquired lease for job {JobId}", workerId, jobId);
-            return LeaseAcquisitionResult.Success(jobId, workerId, expiresAt);
+            return LeaseAcquisitionResult.Succeeded(jobId, workerId, expiresAt);
         }
 
         // Check if existing lease is expired
@@ -81,7 +83,7 @@ public sealed class JobLeaseManager : IDisposable
                 {
                     _logger.LogInformation("Worker {WorkerId} stole expired lease for job {JobId} from {OldWorker}", 
                         workerId, jobId, existingLease.WorkerId);
-                    return LeaseAcquisitionResult.Success(jobId, workerId, expiresAt);
+                    return LeaseAcquisitionResult.Succeeded(jobId, workerId, expiresAt);
                 }
             }
             
@@ -134,7 +136,7 @@ public sealed class JobLeaseManager : IDisposable
         {
             _logger.LogDebug("Worker {WorkerId} renewed lease for job {JobId} (renewal #{Count})", 
                 workerId, jobId, renewedLease.RenewalCount);
-            return LeaseAcquisitionResult.Success(jobId, workerId, expiresAt);
+            return LeaseAcquisitionResult.Succeeded(jobId, workerId, expiresAt);
         }
 
         return LeaseAcquisitionResult.Failed(jobId, "Failed to renew lease");
@@ -268,7 +270,7 @@ public sealed class LeaseAcquisitionResult
     public DateTimeOffset? CurrentOwnerExpiresAt { get; init; }
     public string Message { get; init; } = string.Empty;
 
-    public static LeaseAcquisitionResult Success(string jobId, string workerId, DateTimeOffset expiresAt)
+    public static LeaseAcquisitionResult Succeeded(string jobId, string workerId, DateTimeOffset expiresAt)
     {
         return new LeaseAcquisitionResult
         {
@@ -361,7 +363,6 @@ public static class JobLeaseExtensions
     {
         services.Configure<JobLeaseOptions>(configuration.GetSection("JobLease"));
         services.AddSingleton<JobLeaseManager>();
-        services.AddHostedService(sp => sp.GetRequiredService<JobLeaseManager>());
         return services;
     }
 }

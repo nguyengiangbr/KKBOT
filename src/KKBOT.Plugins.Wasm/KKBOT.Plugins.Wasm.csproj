@@ -11,19 +11,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..KKBOT.Plugins.AbstractionsKKBOT.Plugins.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Device.AbstractionsKKBOT.Device.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.Perception.AbstractionsKKBOT.Perception.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.AI.AbstractionsKKBOT.AI.Abstractions.csproj" />
-    <ProjectReference Include="..KKBOT.ObservabilityKKBOT.Observability.csproj" />
+    <ProjectReference Include="..\KKBOT.Plugins.Abstractions\KKBOT.Plugins.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Device.Abstractions\KKBOT.Device.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Perception.Abstractions\KKBOT.Perception.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.AI.Abstractions\KKBOT.AI.Abstractions.csproj" />
+    <ProjectReference Include="..\KKBOT.Observability\KKBOT.Observability.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Wasmtime" Version="18.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
-    <PackageReference Include="Polly" Version="8.0.0" />
+    <PackageReference Include="Wasmtime" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Polly" />
   </ItemGroup>
 
 </Project>

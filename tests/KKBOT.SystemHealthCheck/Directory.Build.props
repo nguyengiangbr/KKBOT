@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Remove="Microsoft.VisualStudio.Threading.Analyzers" />
+    <PackageReference Remove="Roslynator.Analyzers" />
+    <PackageReference Remove="SonarAnalyzer.CSharp" />
+    <PackageReference Remove="StyleCop.Analyzers" />
+    <PackageReference Remove="Meziantou.Analyzer" />
+  </ItemGroup>
+</Project>

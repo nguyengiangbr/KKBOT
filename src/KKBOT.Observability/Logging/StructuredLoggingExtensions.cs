@@ -1,6 +1,8 @@
 // Copyright (c) KKBOT. All rights reserved.
 // Licensed under the MIT License.
 
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -100,9 +102,9 @@ public static class StructuredLoggingExtensions
                 .Enrich.FromLogContext()
                 .Enrich.WithProperty("Application", appName)
                 .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName)
-                .Enrich.WithMachineName()
-                .Enrich.WithProcessId()
-                .Enrich.WithThreadId()
+                .Enrich.WithProperty("MachineName", System.Environment.MachineName)
+                .Enrich.WithProperty("ProcessId", System.Diagnostics.Process.GetCurrentProcess().Id)
+                .Enrich.WithProperty("ThreadId", System.Environment.CurrentManagedThreadId)
                 .Enrich.With<CorrelationIdEnricher>()
                 .Enrich.With<ActivityEnricher>();
 
@@ -161,21 +163,8 @@ public static class StructuredLoggingExtensions
                 }
             }
 
-            // OpenTelemetry log export
-            if (options.EnableOpenTelemetry)
-            {
-                loggerConfiguration.WriteTo.OpenTelemetry(otlpOptions =>
-                {
-                    otlpOptions.Endpoint = options.OtlpEndpoint;
-                    otlpOptions.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.Grpc;
-                    otlpOptions.ResourceAttributes = new Dictionary<string, object>
-                    {
-                        ["service.name"] = appName,
-                        ["service.version"] = context.Configuration["OpenTelemetry:ServiceVersion"] ?? "1.0.0",
-                        ["deployment.environment"] = context.HostingEnvironment.EnvironmentName
-                    };
-                });
-            }
+            // OpenTelemetry log export is handled by OpenTelemetry logging integration
+            // (see OpenTelemetryExtensions.AddKkbotOpenTelemetry -> AddLogging -> AddOpenTelemetry).
 
             // Filter out noisy health check logs
             loggerConfiguration.Filter.ByExcluding(logEvent =>
@@ -214,10 +203,10 @@ public interface ICorrelationIdProvider
 /// </summary>
 public sealed class CorrelationIdProvider : ICorrelationIdProvider
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
     private string? _fallbackCorrelationId;
 
-    public CorrelationIdProvider(IHttpContextAccessor httpContextAccessor)
+    public CorrelationIdProvider(IHttpContextAccessor? httpContextAccessor)
     {
         _httpContextAccessor = httpContextAccessor;
     }
@@ -225,7 +214,7 @@ public sealed class CorrelationIdProvider : ICorrelationIdProvider
     public string GetCorrelationId()
     {
         // Priority 1: HttpContext header
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = _httpContextAccessor?.HttpContext;
         if (httpContext != null)
         {
             if (httpContext.Request.Headers.TryGetValue("X-Correlation-ID", out var headerValue))
@@ -254,7 +243,7 @@ public sealed class CorrelationIdProvider : ICorrelationIdProvider
     {
         _fallbackCorrelationId = correlationId;
         
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = _httpContextAccessor?.HttpContext;
         if (httpContext != null)
         {
             httpContext.Items["X-Correlation-ID"] = correlationId;
@@ -319,6 +308,10 @@ public sealed class CorrelationIdEnricher : ILogEventEnricher
 {
     private readonly ICorrelationIdProvider _correlationIdProvider;
 
+    public CorrelationIdEnricher() : this(new CorrelationIdProvider(null))
+    {
+    }
+
     public CorrelationIdEnricher(ICorrelationIdProvider correlationIdProvider)
     {
         _correlationIdProvider = correlationIdProvider;
@@ -371,7 +364,7 @@ public sealed class ActivityEnricher : ILogEventEnricher
 /// </summary>
 public static class StructuredLoggingHelpers
 {
-    public static IDisposable BeginInstanceScope(this ILogger logger, Guid instanceId, string? instanceName = null)
+    public static IDisposable? BeginInstanceScope(this Microsoft.Extensions.Logging.ILogger logger, Guid instanceId, string? instanceName = null)
     {
         return logger.BeginScope(new Dictionary<string, object>
         {
@@ -380,7 +373,7 @@ public static class StructuredLoggingHelpers
         });
     }
 
-    public static IDisposable BeginDeviceScope(this ILogger logger, string deviceId, string deviceType)
+    public static IDisposable? BeginDeviceScope(this Microsoft.Extensions.Logging.ILogger logger, string deviceId, string deviceType)
     {
         return logger.BeginScope(new Dictionary<string, object>
         {
@@ -389,7 +382,7 @@ public static class StructuredLoggingHelpers
         });
     }
 
-    public static IDisposable BeginTaskScope(this ILogger logger, string taskId, string taskType, Guid jobRunId)
+    public static IDisposable? BeginTaskScope(this Microsoft.Extensions.Logging.ILogger logger, string taskId, string taskType, Guid jobRunId)
     {
         return logger.BeginScope(new Dictionary<string, object>
         {
@@ -399,7 +392,7 @@ public static class StructuredLoggingHelpers
         });
     }
 
-    public static IDisposable BeginPluginScope(this ILogger logger, string pluginId, string moduleId)
+    public static IDisposable? BeginPluginScope(this Microsoft.Extensions.Logging.ILogger logger, string pluginId, string moduleId)
     {
         return logger.BeginScope(new Dictionary<string, object>
         {
@@ -408,25 +401,25 @@ public static class StructuredLoggingHelpers
         });
     }
 
-    public static void LogPerceptionResult(this ILogger logger, string detectorId, double confidence, bool isMatch, TimeSpan latency)
+    public static void LogPerceptionResult(this Microsoft.Extensions.Logging.ILogger logger, string detectorId, double confidence, bool isMatch, TimeSpan latency)
     {
         logger.LogInformation("Perception result: Detector={DetectorId}, Confidence={Confidence:P2}, Match={IsMatch}, Latency={LatencyMs}ms",
             detectorId, confidence, isMatch, latency.TotalMilliseconds);
     }
 
-    public static void LogAIInference(this ILogger logger, string modelId, string modelType, int tokens, TimeSpan latency, bool success)
+    public static void LogAIInference(this Microsoft.Extensions.Logging.ILogger logger, string modelId, string modelType, int tokens, TimeSpan latency, bool success)
     {
         logger.LogInformation("AI Inference: Model={ModelId}, Type={ModelType}, Tokens={Tokens}, Latency={LatencyMs}ms, Success={Success}",
             modelId, modelType, tokens, latency.TotalMilliseconds, success);
     }
 
-    public static void LogDeviceCapture(this ILogger logger, string deviceId, int width, int height, TimeSpan latency, bool success)
+    public static void LogDeviceCapture(this Microsoft.Extensions.Logging.ILogger logger, string deviceId, int width, int height, TimeSpan latency, bool success)
     {
         logger.LogInformation("Device Capture: Device={DeviceId}, Resolution={Width}x{Height}, Latency={LatencyMs}ms, Success={Success}",
             deviceId, width, height, latency.TotalMilliseconds, success);
     }
 
-    public static void LogRecoveryAttempt(this ILogger logger, Guid instanceId, string level, int attempt, bool success, string? errorCode = null)
+    public static void LogRecoveryAttempt(this Microsoft.Extensions.Logging.ILogger logger, Guid instanceId, string level, int attempt, bool success, string? errorCode = null)
     {
         logger.LogWarning("Recovery Attempt: Instance={InstanceId}, Level={Level}, Attempt={Attempt}, Success={Success}, ErrorCode={ErrorCode}",
             instanceId, level, attempt, success, errorCode ?? "none");
